@@ -33,6 +33,76 @@ router.get('/students', protect, adminOnly, async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+router.post('/create-admin', protect, adminOnly, async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    const exists = await User.findOne({ email });
+    if (exists) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
+
+    const admin = await User.create({
+      name,
+      email,
+      password,
+      role: 'admin'
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Admin created successfully',
+      admin: admin.toJSON()
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put('/update-admin/:id', protect, adminOnly, async (req, res) => {
+  try {
+    const { name, email } = req.body;
+
+    const admin = await User.findByIdAndUpdate(
+      req.params.id,
+      { name, email },
+      { new: true }
+    );
+
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+
+    res.json({ success: true, admin });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+
+router.delete('/delete-admin/:id', protect, adminOnly, async (req, res) => {
+  try {
+    const admin = await User.findByIdAndDelete(req.params.id);
+
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+
+    res.json({ success: true, message: 'Admin deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+
+router.get('/admins', protect, adminOnly, async (req, res) => {
+  try {
+    const admins = await User.find({ role: 'admin' }).sort({ createdAt: -1 });
+    res.json({ success: true, admins });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // Admin login (create default admin if not exists)
 router.post('/setup', async (req, res) => {

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchMe, setInitialized } from './store/slices/authSlice'
@@ -19,6 +19,8 @@ import AdminSections from './pages/admin/AdminSections'
 import AdminHolidays from './pages/admin/AdminHolidays'
 import AdminStudents from './pages/admin/AdminStudents'
 import AdminUpload from './pages/admin/AdminUpload'
+import AdminList from './pages/admin/AdminList'
+import AddAdmin from './pages/admin/AddAdmin'
 
 import LoadingScreen from './components/shared/LoadingScreen'
 
@@ -43,24 +45,36 @@ export default function App() {
   const dispatch = useDispatch()
   const { token, initialized } = useSelector(s => s.auth)
 
+  // ✅ fake loader state
+  const [booting, setBooting] = useState(true)
+
+  // auth initialization
   useEffect(() => {
-    // अगर token है तो user data fetch करो
     if (token && !initialized) {
       dispatch(fetchMe())
-    } 
-    // अगर token नहीं है तो initialized को true set करो ताकि app properly load हो
-    else if (!token && !initialized) {
+    } else if (!token && !initialized) {
       dispatch(setInitialized())
     }
   }, [token, initialized, dispatch])
 
-  if (!initialized) return <LoadingScreen />
+  // 🎯 fake random loader (1.8s - 2.2s)
+  useEffect(() => {
+    const delay = Math.floor(Math.random() * (2200 - 1800 + 1)) + 1800
+
+    const timer = setTimeout(() => {
+      setBooting(false)
+    }, delay)
+
+    return () => clearTimeout(timer)
+  }, [])
+
+  // loader condition
+  if (!initialized || booting) return <LoadingScreen />
 
   return (
     <Routes>
-      {/* Root path को user के status के अनुसार redirect करो */}
       <Route path="/" element={<Navigate to={token ? "/dashboard" : "/login"} replace />} />
-      
+
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
 
@@ -81,6 +95,8 @@ export default function App() {
         <Route path="sections" element={<AdminSections />} />
         <Route path="holidays" element={<AdminHolidays />} />
         <Route path="students" element={<AdminStudents />} />
+        <Route path="admins" element={<AdminList />} />
+        <Route path="add-admin" element={<AddAdmin />} />
       </Route>
 
       <Route path="*" element={<PageNotFound />} />
