@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Users, BookOpen, GraduationCap, LayoutGrid, TrendingUp, Activity } from 'lucide-react'
 import api from '../../services/api'
-
+import { Link } from "react-router-dom"
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ totalStudents: 0, totalSections: 0, totalSubjects: 0, totalEntries: 0 })
   const [loading, setLoading] = useState(true)
@@ -65,6 +65,23 @@ export default function AdminDashboard() {
             </a>
           ))}
         </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+
+  <a href="/admin/add-admin"
+    className="glass-card p-4 hover:border-indigo-500/40 cursor-pointer block">
+    <div className="text-2xl mb-2">➕</div>
+    <p className="text-white font-medium text-sm">Add Admin</p>
+    <p className="text-slate-500 text-xs mt-0.5">Create new admin user</p>
+  </a>
+
+  <a href="/admin/admins"
+    className="glass-card p-4 hover:border-indigo-500/40 cursor-pointer block">
+    <div className="text-2xl mb-2">👮</div>
+    <p className="text-white font-medium text-sm">Manage Admins</p>
+    <p className="text-slate-500 text-xs mt-0.5">View & delete admins</p>
+  </a>
+
+</div>
       </div>
 
       {/* Info */}
