@@ -83,6 +83,23 @@ router.put('/fcm-token', protect, async (req, res) => {
   }
 });
 
+// @POST /api/auth/save-fcm-token (alias for frontend convenience)
+router.post('/save-fcm-token', protect, async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+    if (!fcmToken) {
+      return res.status(400).json({ success: false, message: 'FCM token required' });
+    }
+    
+    await User.findByIdAndUpdate(req.user._id, { fcmToken });
+    console.log(`✅ FCM token saved for user ${req.user._id}`);
+    res.json({ success: true, message: 'FCM token saved successfully' });
+  } catch (error) {
+    console.error('FCM token save error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // @PUT /api/auth/profile
 router.put('/profile', protect, async (req, res) => {
   try {

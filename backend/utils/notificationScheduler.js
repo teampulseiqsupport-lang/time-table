@@ -2,13 +2,10 @@ const moment = require('moment-timezone');
 const User = require('../models/User');
 const Timetable = require('../models/Timetable');
 const Notification = require('../models/Notification');
+const { isFirebaseReady, getFirebaseAdmin } = require('../config/firebase');
 
 let firebaseAdmin = null;
-try {
-  firebaseAdmin = require('firebase-admin');
-} catch (err) {
-  console.warn('⚠️  Firebase Admin not configured. FCM notifications will be disabled.');
-}
+
 
 // Convert "08:00 AM" to minutes from midnight
 const timeToMinutes = (timeStr) => {
@@ -240,8 +237,14 @@ const sendRoomChangedNotification = async (timetable, oldRoom, newRoom) => {
 
 const sendFCMNotification = async (tokens, title, body, data = {}) => {
   try {
-    if (!firebaseAdmin || !process.env.FIREBASE_PROJECT_ID) {
+    if (!isFirebaseReady()) {
       console.warn('⚠️  Firebase not configured. Skipping FCM for:', title);
+      return;
+    }
+
+    firebaseAdmin = getFirebaseAdmin();
+    if (!firebaseAdmin) {
+      console.warn('⚠️  Firebase not available. Skipping FCM for:', title);
       return;
     }
 

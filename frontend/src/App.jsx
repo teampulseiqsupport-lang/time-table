@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchMe, setInitialized } from './store/slices/authSlice'
+import { initializeFirebaseMessaging, requestNotificationPermission } from './services/firebaseNotification'
 
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -81,6 +82,26 @@ export default function App() {
       dispatch(setInitialized())
     }
   }, [token, initialized, dispatch])
+
+  // Firebase messaging init and permission request
+  useEffect(() => {
+    const setupNotifications = async () => {
+      if (token && initialized) {
+        // Initialize Firebase messaging
+        await initializeFirebaseMessaging()
+
+        // Request permission automatically
+        const hasPermission = await requestNotificationPermission()
+        if (hasPermission) {
+          console.log('✅ Push notifications enabled')
+        } else {
+          console.log('⚠️  Push notifications disabled')
+        }
+      }
+    }
+
+    setupNotifications()
+  }, [token, initialized])
 
   // splash only first time
   useEffect(() => {

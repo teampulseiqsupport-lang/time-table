@@ -29,6 +29,7 @@ export default function AdminTimetable() {
   const [filter, setFilter] = useState({ section: '', day: '', session: '2025-26' })
   const [sections, setSections] = useState([])
   const [selectedSlots, setSelectedSlots] = useState([])
+  const [selectedSections, setSelectedSections] = useState([])
 
   useEffect(() => {
     dispatch(fetchAllTimetable({ session: '2025-26' }))
@@ -58,11 +59,31 @@ export default function AdminTimetable() {
     }
     setForm(defaults)
     setSelectedSlots(slot ? [slot] : [])
+    // Initialize selected sections based on filter
+    if (filter.section) {
+      setSelectedSections([filter.section])
+    } else {
+      setSelectedSections([])
+    }
     setModal('add')
   }
 
-  const openEdit = (entry) => { setForm(entry); setSelectedSlots([]); setModal('edit') }
-  const closeModal = () => { setModal(null); setForm(EMPTY); setSelectedSlots([]) }
+  const openEdit = (entry) => { setForm(entry); setSelectedSlots([]); setSelectedSections([]); setModal('edit') }
+  const closeModal = () => { setModal(null); setForm(EMPTY); setSelectedSlots([]); setSelectedSections([]) }
+
+  const handleSectionToggle = (sectionName) => {
+    setSelectedSections(prev => 
+      prev.includes(sectionName) 
+        ? prev.filter(s => s !== sectionName)
+        : [...prev, sectionName]
+    )
+  }
+
+  const selectAllSections = () => {
+    setSelectedSections(prev => 
+      prev.length === sections.length ? [] : sections.map(s => s.name)
+    )
+  }
 
   const handleSlotToggle = (slot) => {
     setSelectedSlots((prev) => {
@@ -76,32 +97,50 @@ export default function AdminTimetable() {
   }
 
   const handleSave = async () => {
-    if (!form.subjectName || !form.section || !form.day) return toast.error('Please fill required fields')
-
-    const dataToSend = {
-      ...form,
-      year: '3rd Year',
-      session: '2025-26'
+    // Validation
+    if (!form.subjectName || !form.day) return toast.error('Please fill required fields')
+    
+    // For add mode: check sections selected
+    if (modal === 'add' && selectedSections.length === 0) {
+      return toast.error('Please select at least one section')
     }
 
     setSaving(true)
     try {
       if (modal === 'edit') {
+        // Edit mode: single entry
+        const dataToSend = {
+          ...form,
+          year: '3rd Year',
+          session: '2025-26'
+        }
         await api.put(`/timetable/${form._id}`, dataToSend)
         toast.success('Entry updated')
       } else {
+        // Add mode: create entries for all selected sections and slots
         const slotsToSave = selectedSlots.length > 0 ? selectedSlots : [{ start: form.startTime, end: form.endTime }]
-        await Promise.all(
-          slotsToSave.map(slot =>
-            api.post('/timetable', {
-              ...dataToSend,
+        
+        const entriesToCreate = []
+        for (const section of selectedSections) {
+          for (const slot of slotsToSave) {
+            entriesToCreate.push({
+              ...form,
+              section: section,
+              year: '3rd Year',
+              session: '2025-26',
               startTime: slot.start,
               endTime: slot.end,
             })
-          )
+          }
+        }
+
+        // Create all entries
+        await Promise.all(
+          entriesToCreate.map(entry => api.post('/timetable', entry))
         )
 
-        toast.success(slotsToSave.length === 1 ? 'Entry created' : `${slotsToSave.length} entries created`)
+        const totalCreated = entriesToCreate.length
+        toast.success(totalCreated === 1 ? 'Entry created' : `${totalCreated} entries created for ${selectedSections.length} section(s)`)
       }
 
       closeModal()
@@ -143,64 +182,76 @@ export default function AdminTimetable() {
 
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
             <BookOpen size={20} className="text-indigo-400" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white">Timetable Management</h1>
-            <p className="text-slate-400 text-sm">Session 2025-26 • {filtered.length} entries</p>
+            <p className="text-slate-400 text-sm">Session 2025-26 • {filtered.length} entries • {sectionList.length} sections</p>
           </div>
         </div>
-        <button onClick={() => openAdd()} className="btn-primary flex items-center gap-2">
+        <button onClick={() => openAdd()} className="btn-primary flex items-center gap-2 whitespace-nowrap">
           <Plus size={16} />
           Add Entry
         </button>
       </div>
 
       <div className="glass-card p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-white font-semibold">Quick slot entry</h2>
-            <p className="text-slate-400 text-sm">Click any time slot to open its own form. You can also select multiple slots and save them together.</p>
+            <h2 className="text-white font-semibold">⚡ Quick Time Slot Entry</h2>
+            <p className="text-slate-400 text-sm">Click any time slot or use the form below to add entries to multiple sections</p>
           </div>
-          <button onClick={() => openAdd()} className="btn-secondary">Open add form</button>
+          <button onClick={() => openAdd()} className="btn-secondary text-sm">Open add form</button>
         </div>
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {TIME_SLOTS.map(slot => (
             <button
               key={slot.label}
               type="button"
               onClick={() => openAdd(slot)}
-              className="rounded-2xl border border-slate-700 bg-slate-800/80 p-3 text-left transition-all hover:border-indigo-500/60 hover:bg-slate-800"
+              className="rounded-xl border border-slate-700 bg-slate-800/60 p-3 text-left transition-all hover:border-indigo-500/60 hover:bg-indigo-500/10 group"
             >
-              <div className="text-xs uppercase tracking-[0.18em] text-indigo-300">{slot.label}</div>
-              <p className="mt-1 text-sm text-slate-200">Open a dedicated form for this time slot</p>
+              <div className="text-xs uppercase tracking-wider font-semibold text-indigo-300 group-hover:text-indigo-200">{slot.label}</div>
+              <p className="mt-1 text-xs text-slate-400 group-hover:text-slate-300">Click to open form</p>
             </button>
           ))}
         </div>
       </div>
 
       {/* Filters */}
-      <div className="glass-card p-4 flex flex-wrap gap-3">
-        <div className="input-field bg-slate-700/50 text-slate-300 font-medium">
-          2025-26
+      <div className="glass-card p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-700/50 border border-slate-600">
+            <span className="text-xs text-slate-400 font-medium">📅 Session:</span>
+            <span className="text-sm font-semibold text-slate-200">2025-26</span>
+          </div>
+          
+          <select value={filter.section} onChange={e => setFilter({ ...filter, section: e.target.value })}
+            className="input-field w-auto text-sm py-1.5">
+            <option value="">📚 All Sections</option>
+            {sectionList.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          
+          <select value={filter.day} onChange={e => setFilter({ ...filter, day: e.target.value })}
+            className="input-field w-auto text-sm py-1.5">
+            <option value="">📆 All Days</option>
+            {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          
+          <button onClick={applyFilter} className="btn-secondary flex items-center gap-1.5 text-sm py-1.5">
+            <Filter size={14} />
+            Apply Filter
+          </button>
+          
+          {(filter.section || filter.day) && (
+            <button onClick={() => setFilter({ section: '', day: '', session: '2025-26' })} className="px-3 py-1.5 text-xs rounded-lg bg-slate-700/50 text-slate-300 hover:text-white transition-colors">
+              Clear
+            </button>
+          )}
         </div>
-        <select value={filter.section} onChange={e => setFilter({ ...filter, section: e.target.value })}
-          className="input-field w-auto">
-          <option value="">All Sections</option>
-          {sectionList.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={filter.day} onChange={e => setFilter({ ...filter, day: e.target.value })}
-          className="input-field w-auto">
-          <option value="">All Days</option>
-          {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
-        <button onClick={applyFilter} className="btn-secondary flex items-center gap-1.5">
-          <Filter size={14} />
-          Apply
-        </button>
       </div>
 
       {/* Table */}
@@ -270,7 +321,14 @@ export default function AdminTimetable() {
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="glass-card p-6 w-full max-w-2xl my-8 animate-slide-up">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold text-white">{modal === 'add' ? 'Add' : 'Edit'} Timetable Entry</h2>
+              <div>
+                <h2 className="text-lg font-bold text-white">
+                  {modal === 'add' ? '➕ Add New Timetable Entry' : '✏️ Edit Timetable Entry'}
+                </h2>
+                {modal === 'add' && (
+                  <p className="text-xs text-slate-400 mt-1">Select sections and time slots to create entries in bulk</p>
+                )}
+              </div>
               <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white">
                 <X size={18} />
               </button>
@@ -293,15 +351,68 @@ export default function AdminTimetable() {
                 </div>
               </div>
 
-              {/* Section Dropdown */}
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Section *</label>
-                <select value={form.section} onChange={e => setForm({ ...form, section: e.target.value })}
-                  className="input-field">
-                  <option value="">Select Section</option>
-                  {sections.map(s => <option key={s._id} value={s.name}>{s.name}</option>)}
-                </select>
-              </div>
+              {/* Multi-Section Selection */}
+              {modal === 'add' && (
+                <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-indigo-300 mb-1">📚 SELECT SECTIONS *</label>
+                      <p className="text-xs text-slate-400">Pick one or more sections to add this entry</p>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={selectAllSections}
+                      className="px-2 py-1 text-xs rounded bg-indigo-500/30 text-indigo-200 hover:bg-indigo-500/50 transition-colors"
+                    >
+                      {selectedSections.length === sections.length ? 'Clear all' : 'Select all'}
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
+                    {sections.map(section => (
+                      <button
+                        key={section._id}
+                        type="button"
+                        onClick={() => handleSectionToggle(section.name)}
+                        className={`p-2.5 rounded-lg border-2 transition-all text-left text-sm font-medium ${
+                          selectedSections.includes(section.name)
+                            ? 'bg-indigo-500/40 border-indigo-400 text-indigo-100'
+                            : 'border-slate-600 bg-slate-700/30 text-slate-400 hover:border-indigo-400/50 hover:bg-slate-600/40'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-4 h-4 rounded border-2 flex items-center justify-center text-xs ${
+                            selectedSections.includes(section.name)
+                              ? 'bg-indigo-500 border-indigo-500'
+                              : 'border-slate-500'
+                          }`}>
+                            {selectedSections.includes(section.name) && '✓'}
+                          </span>
+                          {section.name}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {selectedSections.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-indigo-400/20">
+                      <p className="text-xs text-indigo-200">
+                        ✓ Selected: <span className="font-semibold">{selectedSections.length} section(s)</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Single Section View for Edit Mode */}
+              {modal === 'edit' && (
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Section (Edit only)</label>
+                  <div className="input-field bg-slate-700/50 text-slate-300 font-medium cursor-not-allowed">
+                    {form.section}
+                  </div>
+                </div>
+              )}
 
               {/* Day Selection - Monday to Friday only */}
               <div>
@@ -314,11 +425,19 @@ export default function AdminTimetable() {
 
               {/* Time Slot Selection */}
               <div>
-                <label className="block text-xs text-slate-400 mb-2">Time Slot *</label>
-                <div className="flex items-center gap-2 mb-2 text-xs text-slate-300">
-                  <button type="button" onClick={toggleAllSlots} className="btn-secondary px-3 py-1.5 text-xs">{selectedSlots.length === TIME_SLOTS.length ? 'Clear all' : 'Select all'}</button>
-                  <span>{selectedSlots.length > 0 ? `${selectedSlots.length} slot(s) selected` : 'Single slot mode'}</span>
-                </div>
+                <label className="block text-xs text-slate-400 mb-2 font-semibold">⏰ TIME SLOT(S) *</label>
+                {modal === 'add' && (
+                  <div className="flex items-center gap-2 mb-3 text-xs">
+                    <button type="button" onClick={toggleAllSlots} className="btn-secondary px-2.5 py-1 text-xs">{selectedSlots.length === TIME_SLOTS.length ? 'Clear all' : 'Select all'}</button>
+                    <span className="text-slate-400">
+                      {selectedSlots.length > 0 ? (
+                        <span className="text-indigo-300 font-semibold">{selectedSlots.length} slot(s) selected</span>
+                      ) : (
+                        <span>Single slot mode (one entry)</span>
+                      )}
+                    </span>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
                   {TIME_SLOTS.map(slot => {
                     const active = selectedSlots.some(item => item.start === slot.start && item.end === slot.end)
@@ -326,20 +445,23 @@ export default function AdminTimetable() {
                       <button
                         key={slot.label}
                         type="button"
-                        onClick={() => handleSlotToggle(slot)}
-                        className={`p-2 text-sm rounded-lg border text-left transition-all ${
+                        onClick={() => modal === 'add' && handleSlotToggle(slot)}
+                        disabled={modal === 'edit'}
+                        className={`p-2.5 text-sm rounded-lg border-2 text-left transition-all ${
                           active
                             ? 'bg-indigo-500/30 border-indigo-500 text-indigo-100'
                             : 'border-slate-600 text-slate-400 hover:border-indigo-500/50 hover:text-slate-300'
-                        }`}
+                        } ${modal === 'edit' ? 'opacity-60 cursor-not-allowed' : ''}`}
                       >
-                        <div className="font-medium">{slot.label}</div>
-                        <div className="text-[11px] text-slate-300">{active ? 'Selected for bulk save' : 'Click to add this slot'}</div>
+                        <div className="font-semibold text-xs uppercase">{slot.label}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">{active ? '✓ Selected' : 'Click to add'}</div>
                       </button>
                     )
                   })}
                 </div>
-                <p className="text-xs text-slate-400 mt-2">Choose one slot for a single entry, or select multiple slots to save them together with the same section/day details.</p>
+                {modal === 'add' && (
+                  <p className="text-xs text-slate-500 mt-2">📌 Select multiple slots to save the same entry across different times</p>
+                )}
               </div>
 
               {/* Subject Name */}
@@ -387,12 +509,23 @@ export default function AdminTimetable() {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t border-slate-700">
-                <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                  <Save size={15} />
-                  {saving ? 'Saving...' : 'Save'}
-                </button>
-                <button onClick={closeModal} className="btn-secondary">Cancel</button>
+              <div className="space-y-2 pt-4 border-t border-slate-700">
+                {/* Summary for Add Mode */}
+                {modal === 'add' && selectedSections.length > 0 && (
+                  <div className="bg-slate-800/50 rounded-lg p-3 text-xs text-slate-300 space-y-1">
+                    <p className="font-semibold text-slate-200">📊 Creating:</p>
+                    <p>• <span className="font-mono">{selectedSections.length}</span> section(s) × <span className="font-mono">{selectedSlots.length > 0 ? selectedSlots.length : 1}</span> time slot(s) = <span className="text-indigo-300 font-semibold">{selectedSections.length * (selectedSlots.length > 0 ? selectedSlots.length : 1)} total entries</span></p>
+                    <p className="text-slate-400">Day: <span className="font-semibold text-slate-300">{form.day}</span></p>
+                  </div>
+                )}
+                
+                <div className="flex gap-3">
+                  <button onClick={handleSave} disabled={saving || (modal === 'add' && selectedSections.length === 0)} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <Save size={15} />
+                    {saving ? 'Saving...' : modal === 'add' ? `Create ${selectedSections.length * (selectedSlots.length > 0 ? selectedSlots.length : 1)} Entries` : 'Update'}
+                  </button>
+                  <button onClick={closeModal} className="btn-secondary">Cancel</button>
+                </div>
               </div>
             </div>
           </div>
