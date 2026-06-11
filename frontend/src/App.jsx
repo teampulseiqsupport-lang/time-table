@@ -11,6 +11,7 @@ import WeeklyView from './pages/WeeklyView'
 import CalendarView from './pages/CalendarView'
 import NotificationsPage from './pages/NotificationsPage'
 import ProfilePage from './pages/ProfilePage'
+import PageNotFound from './pages/PageNotFound';
 
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminTimetable from './pages/admin/AdminTimetable'
@@ -82,7 +83,7 @@ export default function App() {
         <Route path="students" element={<AdminStudents />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<PageNotFound />} />
     </Routes>
   )
 }
