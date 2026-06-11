@@ -5,21 +5,43 @@ import { fetchAllTimetable } from '../../store/slices/timetableSlice'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 const TYPES = ['Theory', 'Lab', 'Lunch', 'Free']
-const EMPTY = { session: '2024-25', year: '', section: '', day: 'Monday', subjectName: '', subjectCode: '', facultyName: '', room: '', block: '', startTime: '08:00 AM', endTime: '09:00 AM', type: 'Theory' }
+const TIME_SLOTS = [
+  { label: '08:00 AM - 09:00 AM', start: '08:00 AM', end: '09:00 AM' },
+  { label: '09:00 AM - 10:00 AM', start: '09:00 AM', end: '10:00 AM' },
+  { label: '10:00 AM - 11:00 AM', start: '10:00 AM', end: '11:00 AM' },
+  { label: '11:00 AM - 12:00 PM', start: '11:00 AM', end: '12:00 PM' },
+  { label: '12:00 PM - 01:00 PM', start: '12:00 PM', end: '01:00 PM' },
+  { label: '01:00 PM - 02:00 PM', start: '01:00 PM', end: '02:00 PM' },
+  { label: '02:00 PM - 03:00 PM', start: '02:00 PM', end: '03:00 PM' },
+  { label: '03:00 PM - 04:00 PM', start: '03:00 PM', end: '04:00 PM' },
+]
+
+const EMPTY = { session: '2025-26', year: '3rd Year', section: '', day: 'Monday', subjectName: '', subjectCode: '', facultyName: '', room: '', block: '', startTime: '08:00 AM', endTime: '09:00 AM', type: 'Theory' }
 
 export default function AdminTimetable() {
   const dispatch = useDispatch()
   const { allEntries } = useSelector(s => s.timetable)
-  const [modal, setModal] = useState(null) // null | 'add' | 'edit'
+  const [modal, setModal] = useState(null)
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
-  const [filter, setFilter] = useState({ section: '', day: '', session: '2024-25' })
+  const [filter, setFilter] = useState({ section: '', day: '', session: '2025-26' })
+  const [sections, setSections] = useState([])
 
   useEffect(() => {
-    dispatch(fetchAllTimetable(filter.session ? { session: filter.session } : {}))
+    dispatch(fetchAllTimetable({ session: '2025-26' }))
+    fetchSections()
   }, [dispatch])
+
+  const fetchSections = async () => {
+    try {
+      const { data } = await api.get('/sections', { params: { session: '2025-26' } })
+      setSections(data.sections || [])
+    } catch (err) {
+      console.error('Failed to fetch sections:', err)
+    }
+  }
 
   const applyFilter = () => {
     dispatch(fetchAllTimetable({ ...filter }))
@@ -28,6 +50,10 @@ export default function AdminTimetable() {
   const openAdd = () => { setForm(EMPTY); setModal('add') }
   const openEdit = (entry) => { setForm(entry); setModal('edit') }
   const closeModal = () => { setModal(null); setForm(EMPTY) }
+
+  const handleSlotChange = (slot) => {
+    setForm({ ...form, startTime: slot.start, endTime: slot.end })
+  }
 
   const handleSave = async () => {
     if (!form.subjectName || !form.section || !form.day) return toast.error('Please fill required fields')
@@ -41,7 +67,7 @@ export default function AdminTimetable() {
         toast.success('Entry created')
       }
       closeModal()
-      dispatch(fetchAllTimetable({ session: filter.session }))
+      dispatch(fetchAllTimetable({ session: '2025-26' }))
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to save')
     } finally {
@@ -54,7 +80,7 @@ export default function AdminTimetable() {
     try {
       await api.delete(`/timetable/${id}`)
       toast.success('Deleted')
-      dispatch(fetchAllTimetable({ session: filter.session }))
+      dispatch(fetchAllTimetable({ session: '2025-26' }))
     } catch {
       toast.error('Failed to delete')
     }
@@ -66,16 +92,16 @@ export default function AdminTimetable() {
     try {
       await api.post(`/timetable/${id}/cancel`, { reason })
       toast.success('Class cancelled')
-      dispatch(fetchAllTimetable({ session: filter.session }))
+      dispatch(fetchAllTimetable({ session: '2025-26' }))
     } catch { toast.error('Failed') }
   }
 
   const filtered = allEntries.filter(e =>
-    (!filter.section || e.section === filter.section.toUpperCase()) &&
+    (!filter.section || e.section === filter.section) &&
     (!filter.day || e.day === filter.day)
   )
 
-  const sections = [...new Set(allEntries.map(e => e.section))].sort()
+  const sectionList = [...new Set(allEntries.map(e => e.section))].sort()
 
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto space-y-5">
@@ -85,8 +111,8 @@ export default function AdminTimetable() {
             <BookOpen size={20} className="text-indigo-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Timetable</h1>
-            <p className="text-slate-400 text-sm">{filtered.length} entries</p>
+            <h1 className="text-2xl font-bold text-white">Timetable Management</h1>
+            <p className="text-slate-400 text-sm">Session 2025-26 • {filtered.length} entries</p>
           </div>
         </div>
         <button onClick={openAdd} className="btn-primary flex items-center gap-2">
@@ -97,14 +123,13 @@ export default function AdminTimetable() {
 
       {/* Filters */}
       <div className="glass-card p-4 flex flex-wrap gap-3">
-        <select value={filter.session} onChange={e => setFilter({ ...filter, session: e.target.value })}
-          className="input-field w-auto">
-          {['2024-25', '2025-26', '2026-27'].map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
+        <div className="input-field bg-slate-700/50 text-slate-300 font-medium">
+          2025-26
+        </div>
         <select value={filter.section} onChange={e => setFilter({ ...filter, section: e.target.value })}
           className="input-field w-auto">
           <option value="">All Sections</option>
-          {sections.map(s => <option key={s} value={s}>{s}</option>)}
+          {sectionList.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <select value={filter.day} onChange={e => setFilter({ ...filter, day: e.target.value })}
           className="input-field w-auto">
@@ -181,8 +206,8 @@ export default function AdminTimetable() {
 
       {/* Modal */}
       {modal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass-card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-slide-up">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="glass-card p-6 w-full max-w-2xl my-8 animate-slide-up">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-bold text-white">{modal === 'add' ? 'Add' : 'Edit'} Timetable Entry</h2>
               <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white">
@@ -190,42 +215,71 @@ export default function AdminTimetable() {
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Session & Year - Locked */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Session *</label>
-                  <select value={form.session} onChange={e => setForm({ ...form, session: e.target.value })} className="input-field">
-                    {['2024-25', '2025-26'].map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  <label className="block text-xs text-slate-400 mb-1">Session</label>
+                  <div className="input-field bg-slate-700/50 text-slate-300 font-medium cursor-not-allowed">
+                    2025-26
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Section *</label>
-                  <input value={form.section} onChange={e => setForm({ ...form, section: e.target.value })}
-                    className="input-field" placeholder="e.g. 3A" />
+                  <label className="block text-xs text-slate-400 mb-1">Year</label>
+                  <div className="input-field bg-slate-700/50 text-slate-300 font-medium cursor-not-allowed">
+                    3rd Year
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Day *</label>
-                  <select value={form.day} onChange={e => setForm({ ...form, day: e.target.value })} className="input-field">
-                    {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Type</label>
-                  <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="input-field">
-                    {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
+              {/* Section Dropdown */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Section *</label>
+                <select value={form.section} onChange={e => setForm({ ...form, section: e.target.value })}
+                  className="input-field">
+                  <option value="">Select Section</option>
+                  {sections.map(s => <option key={s._id} value={s.name}>{s.name}</option>)}
+                </select>
+              </div>
+
+              {/* Day Selection - Monday to Friday only */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Day *</label>
+                <select value={form.day} onChange={e => setForm({ ...form, day: e.target.value })}
+                  className="input-field">
+                  {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+
+              {/* Time Slot Selection */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-2">Time Slot *</label>
+                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                  {TIME_SLOTS.map(slot => (
+                    <button
+                      key={slot.label}
+                      type="button"
+                      onClick={() => handleSlotChange(slot)}
+                      className={`p-2 text-sm rounded-lg border transition-all ${
+                        form.startTime === slot.start && form.endTime === slot.end
+                          ? 'bg-indigo-500/30 border-indigo-500 text-indigo-200'
+                          : 'border-slate-600 text-slate-400 hover:border-indigo-500/50 hover:text-slate-300'
+                      }`}
+                    >
+                      {slot.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
+              {/* Subject Name */}
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Subject Name *</label>
                 <input value={form.subjectName} onChange={e => setForm({ ...form, subjectName: e.target.value })}
                   className="input-field" placeholder="e.g. Java Programming" />
               </div>
 
+              {/* Subject Code & Faculty */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Subject Code</label>
@@ -239,6 +293,7 @@ export default function AdminTimetable() {
                 </div>
               </div>
 
+              {/* Room & Block */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Room</label>
@@ -252,20 +307,17 @@ export default function AdminTimetable() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Start Time *</label>
-                  <input value={form.startTime} onChange={e => setForm({ ...form, startTime: e.target.value })}
-                    className="input-field font-mono" placeholder="08:00 AM" />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">End Time *</label>
-                  <input value={form.endTime} onChange={e => setForm({ ...form, endTime: e.target.value })}
-                    className="input-field font-mono" placeholder="09:00 AM" />
-                </div>
+              {/* Type Selection */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Type</label>
+                <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}
+                  className="input-field">
+                  {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              {/* Actions */}
+              <div className="flex gap-3 pt-4 border-t border-slate-700">
                 <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 flex items-center justify-center gap-2">
                   <Save size={15} />
                   {saving ? 'Saving...' : 'Save'}

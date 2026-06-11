@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react'
-import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, Info } from 'lucide-react'
+import React, { useState, useRef, useEffect } from 'react'
+import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, Info, Download, Calendar } from 'lucide-react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
@@ -7,9 +7,39 @@ export default function AdminUpload() {
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [result, setResult] = useState(null)
-  const [session, setSession] = useState('2024-25')
+  const [session, setSession] = useState('2025-26')
   const [dragOver, setDragOver] = useState(false)
+  const [refFile, setRefFile] = useState(null)
+  const [loadingRef, setLoadingRef] = useState(false)
   const fileRef = useRef()
+
+  // Fetch reference file info on mount
+  useEffect(() => {
+    fetchReferenceFile()
+  }, [])
+
+  const fetchReferenceFile = async () => {
+    setLoadingRef(true)
+    try {
+      const { data } = await api.get('/timetable/reference/info')
+      if (data.success && data.refFile) {
+        setRefFile(data.refFile)
+      }
+    } catch (err) {
+      console.error('Error fetching reference:', err)
+    } finally {
+      setLoadingRef(false)
+    }
+  }
+
+  const handleDownloadReference = () => {
+    if (!refFile) return
+    toast.success(`📥 Download initiated for: ${refFile.fileName}`)
+    // Note: In production, implement actual download via API endpoint
+    // const link = document.createElement('a')
+    // link.href = `/public/reference-files/${refFile.fileName}`
+    // link.click()
+  }
 
   const handleFile = (f) => {
     if (f && (f.name.endsWith('.xlsx') || f.name.endsWith('.xls'))) {
@@ -33,12 +63,15 @@ export default function AdminUpload() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('session', session)
+      formData.append('session', '2025-26')
       const { data } = await api.post('/timetable/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
       setResult(data)
+      setFile(null)
       toast.success(`Upload successful: ${data.created} created, ${data.updated} updated`)
+      // Refresh reference file info
+      setTimeout(fetchReferenceFile, 500)
     } catch (err) {
       toast.error(err.response?.data?.message || 'Upload failed')
     } finally {
@@ -77,13 +110,65 @@ export default function AdminUpload() {
         </div>
       </div>
 
-      {/* Session selector */}
+      {/* Session selector - Locked to 2025-26 */}
       <div className="glass-card p-5">
         <label className="block text-sm font-medium text-slate-300 mb-2">Academic Session</label>
-        <select value={session} onChange={e => setSession(e.target.value)} className="input-field max-w-xs">
-          {['2023-24', '2024-25', '2025-26', '2026-27'].map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
+        <div className="input-field bg-slate-700/50 text-slate-300 font-medium cursor-not-allowed">
+          2025-26
+        </div>
+        <p className="text-slate-500 text-xs mt-2">Session is locked to 2025-26 for all uploads</p>
       </div>
+
+      {/* Current Reference File Status */}
+      {loadingRef ? (
+        <div className="glass-card p-5 animate-pulse">
+          <div className="h-4 bg-slate-700/50 rounded w-1/4 mb-3"></div>
+          <div className="h-10 bg-slate-700/50 rounded"></div>
+        </div>
+      ) : refFile ? (
+        <div className="glass-card p-5 border-emerald-500/20 bg-emerald-500/5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle size={18} className="text-emerald-400" />
+                <p className="font-semibold text-emerald-300">Current Reference Timetable</p>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2 text-slate-300">
+                  <FileSpreadsheet size={14} className="text-cyan-400" />
+                  <span><strong>File:</strong> {refFile.fileName}</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-300">
+                  <span><strong>Size:</strong> {refFile.fileSize}</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-300">
+                  <Calendar size={14} className="text-indigo-400" />
+                  <span><strong>Uploaded:</strong> {new Date(refFile.uploadDate).toLocaleDateString('en-IN')} {new Date(refFile.uploadDate).toLocaleTimeString('en-IN')}</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-300">
+                  <span><strong>Uploaded By:</strong> {refFile.uploadedBy}</span>
+                </div>
+                <p className="text-slate-400 text-xs italic mt-2">{refFile.description}</p>
+              </div>
+            </div>
+            <button
+              onClick={handleDownloadReference}
+              className="btn-secondary flex items-center gap-2 py-2 px-3 flex-shrink-0 whitespace-nowrap"
+              title="Download the official reference timetable"
+            >
+              <Download size={16} />
+              <span className="text-sm">Download</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="glass-card p-5 border-amber-500/20 bg-amber-500/5">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={18} className="text-amber-400" />
+            <p className="text-amber-300">No reference timetable uploaded yet. Upload the first file to set the official reference.</p>
+          </div>
+        </div>
+      )}
 
       {/* Drop zone */}
       <div

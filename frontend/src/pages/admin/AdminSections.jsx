@@ -7,13 +7,13 @@ export default function AdminSections() {
   const [sections, setSections] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
-  const [form, setForm] = useState({ name: '', session: '2024-25', year: '' })
+  const [form, setForm] = useState({ name: '', session: '2025-26', year: '3rd Year' })
   const [saving, setSaving] = useState(false)
 
   const fetchSections = async () => {
     setLoading(true)
     try {
-      const { data } = await api.get('/sections')
+      const { data } = await api.get('/sections', { params: { session: '2025-26' } })
       setSections(data.sections)
     } catch { toast.error('Failed to load sections') }
     finally { setLoading(false) }
@@ -21,11 +21,11 @@ export default function AdminSections() {
 
   useEffect(() => { fetchSections() }, [])
 
-  const openAdd = () => { setForm({ name: '', session: '2024-25', year: '' }); setModal('add') }
+  const openAdd = () => { setForm({ name: '', session: '2025-26', year: '3rd Year' }); setModal('add') }
   const openEdit = (sec) => { setForm(sec); setModal('edit') }
 
   const handleSave = async () => {
-    if (!form.name || !form.session) return toast.error('Name and session required')
+    if (!form.name || !form.session) return toast.error('Section name required')
     setSaving(true)
     try {
       if (modal === 'edit') await api.put(`/sections/${form._id}`, form)
@@ -116,15 +116,16 @@ export default function AdminSections() {
                   className="input-field font-mono uppercase" placeholder="e.g. 3A" />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Session *</label>
-                <select value={form.session} onChange={e => setForm({ ...form, session: e.target.value })} className="input-field">
-                  {['2024-25', '2025-26', '2026-27'].map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <label className="block text-xs text-slate-400 mb-1">Session</label>
+                <div className="input-field bg-slate-700/50 text-slate-300 font-medium cursor-not-allowed">
+                  2025-26
+                </div>
               </div>
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Year</label>
-                <input value={form.year} onChange={e => setForm({ ...form, year: e.target.value })}
-                  className="input-field" placeholder="3rd Year" />
+                <div className="input-field bg-slate-700/50 text-slate-300 font-medium cursor-not-allowed">
+                  3rd Year
+                </div>
               </div>
               <div className="flex gap-3 pt-1">
                 <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 flex items-center justify-center gap-2">

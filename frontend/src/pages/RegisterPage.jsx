@@ -11,7 +11,7 @@ const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year']
 export default function RegisterPage() {
   const dispatch = useDispatch()
   const { loading } = useSelector(s => s.auth)
-  const [form, setForm] = useState({ name: '', email: '', password: '', section: '', year: '', session: '2024-25' })
+  const [form, setForm] = useState({ name: '', email: '', password: '', section: '', year: '3rd Year', session: '2025-26' })
   const [showPass, setShowPass] = useState(false)
   const [sections, setSections] = useState([])
   const [sectionSearch, setSectionSearch] = useState('')
@@ -20,12 +20,12 @@ export default function RegisterPage() {
   useEffect(() => {
     const fetchSections = async () => {
       try {
-        const { data } = await api.get('/sections', { params: { session: form.session } })
+        const { data } = await api.get('/sections', { params: { session: '2025-26' } })
         setSections(data.sections || [])
       } catch {}
     }
     fetchSections()
-  }, [form.session])
+  }, [])
 
   const filteredSections = sections.filter(s =>
     s.name.toLowerCase().includes(sectionSearch.toLowerCase())
@@ -72,22 +72,19 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Session + Year */}
+            {/* Session + Year (Fixed for 3rd Year 2025-26) */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Session</label>
-                <select value={form.session} onChange={e => setForm({ ...form, session: e.target.value })}
-                  className="input-field">
-                  {SESSIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <div className="input-field bg-slate-700/50 cursor-not-allowed flex items-center">
+                  <span className="text-slate-300 font-medium">2025-26</span>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Year</label>
-                <select value={form.year} onChange={e => setForm({ ...form, year: e.target.value })}
-                  className="input-field">
-                  <option value="">Select Year</option>
-                  {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
+                <div className="input-field bg-slate-700/50 cursor-not-allowed flex items-center">
+                  <span className="text-slate-300 font-medium">3rd Year</span>
+                </div>
               </div>
             </div>
 

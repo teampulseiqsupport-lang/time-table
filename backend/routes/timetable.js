@@ -3,11 +3,18 @@ const router = express.Router();
 const multer = require('multer');
 const XLSX = require('xlsx');
 const moment = require('moment-timezone');
+const fs = require('fs');
+const path = require('path');
 const Timetable = require('../models/Timetable');
 const Section = require('../models/Section');
 const Holiday = require('../models/Holiday');
+const ReferenceFile = require('../models/ReferenceFile');
 const { protect, adminOnly } = require('../middleware/auth');
-const { sendTimetableUpdateNotification } = require('../utils/notificationScheduler');
+const { 
+  sendTimetableUpdateNotification,
+  sendClassCancelledNotification,
+  sendRoomChangedNotification
+} = require('../utils/notificationScheduler');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -206,6 +213,42 @@ router.post('/upload', protect, adminOnly, upload.single('file'), async (req, re
       }
     }
 
+    // Save reference file metadata
+    try {
+      const publicDir = path.join(__dirname, '../public/reference-files');
+      if (!fs.existsSync(publicDir)) {
+        fs.mkdirSync(publicDir, { recursive: true });
+      }
+
+      const timestamp = Date.now();
+      const fileExtension = path.extname(req.file.originalname);
+      const fileName = `timetable-reference-${timestamp}${fileExtension}`;
+      const filePath = path.join(publicDir, fileName);
+
+      // Save file to disk
+      fs.writeFileSync(filePath, req.file.buffer);
+
+      // Archive previous references
+      await ReferenceFile.updateMany({ session: '2025-26', status: 'active' }, { status: 'archived' });
+
+      // Save reference metadata to database
+      const refFile = await ReferenceFile.create({
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+        uploadedBy: req.user.name || 'Admin',
+        session: '2025-26',
+        year: '3rd Year',
+        status: 'active',
+        description: `Official timetable reference uploaded for 2025-26 (3rd Year)`
+      });
+
+      console.log('✅ Reference file saved:', fileName);
+    } catch (refErr) {
+      console.error('Reference file save error (non-critical):', refErr);
+      // Don't fail the upload if reference save fails
+    }
+
     // Notify all students about timetable update
     sendTimetableUpdateNotification();
 
@@ -263,9 +306,12 @@ router.put('/:id', protect, adminOnly, async (req, res) => {
       updated.roomChanged = true;
       updated.oldRoom = original.room;
       await updated.save();
+      
+      // Send room change notification
+      await sendRoomChangedNotification(updated, original.room, req.body.room);
     }
 
-    res.json({ success: true, timetable: updated });
+    res.json({ success: true, timetable: updated, message: 'Entry updated successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -290,7 +336,68 @@ router.post('/:id/cancel', protect, adminOnly, async (req, res) => {
       { isCancelled: true, cancellationReason: reason || 'Cancelled by admin' },
       { new: true }
     );
-    res.json({ success: true, timetable: entry });
+    
+    // Send cancellation notification
+    if (entry) {
+      await sendClassCancelledNotification(entry, reason);
+    }
+    
+    res.json({ success: true, timetable: entry, message: 'Class cancelled and notifications sent' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @GET /api/timetable/reference/info - Get current reference file info (student/admin accessible)
+router.get('/reference/info', async (req, res) => {
+  try {
+    const refFile = await ReferenceFile.findOne({ 
+      session: '2025-26',
+      status: 'active', 
+      isActive: true 
+    }).sort({ uploadDate: -1 }).lean();
+
+    if (!refFile) {
+      return res.json({ success: true, refFile: null, message: 'No reference file uploaded yet' });
+    }
+
+    res.json({
+      success: true,
+      refFile: {
+        _id: refFile._id,
+        fileName: refFile.fileName,
+        fileSize: (refFile.fileSize / 1024).toFixed(1) + ' KB',
+        uploadedBy: refFile.uploadedBy,
+        uploadDate: refFile.uploadDate,
+        session: refFile.session,
+        year: refFile.year,
+        description: refFile.description
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @GET /api/timetable/reference/history - Get all reference files (admin only)
+router.get('/reference/history', protect, adminOnly, async (req, res) => {
+  try {
+    const refFiles = await ReferenceFile.find({ session: '2025-26', isActive: true })
+      .sort({ uploadDate: -1 })
+      .lean();
+
+    res.json({
+      success: true,
+      refFiles: refFiles.map(rf => ({
+        _id: rf._id,
+        fileName: rf.fileName,
+        fileSize: (rf.fileSize / 1024).toFixed(1) + ' KB',
+        uploadedBy: rf.uploadedBy,
+        uploadDate: rf.uploadDate,
+        status: rf.status,
+        description: rf.description
+      }))
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

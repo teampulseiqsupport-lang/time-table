@@ -1,6 +1,6 @@
 import React from 'react'
 
-export default function LoadingScreen() {
+export default function LoadingScreen({ text = "Loading your schedule..." }) {
   return (
     <div className="min-h-screen bg-navy-900 flex items-center justify-center">
       <div className="text-center">
@@ -17,7 +17,7 @@ export default function LoadingScreen() {
           </div>
         </div>
         <p className="gradient-text font-bold text-lg">TimeTable Pro</p>
-        <p className="text-slate-500 text-sm mt-1">Loading your schedule...</p>
+        <p className="text-slate-500 text-sm mt-1">{text}</p>
       </div>
     </div>
   )
