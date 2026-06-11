@@ -28,6 +28,7 @@ export default function AdminTimetable() {
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState({ section: '', day: '', session: '2025-26' })
   const [sections, setSections] = useState([])
+  const [selectedSlots, setSelectedSlots] = useState([])
 
   useEffect(() => {
     dispatch(fetchAllTimetable({ session: '2025-26' }))
@@ -47,25 +48,62 @@ export default function AdminTimetable() {
     dispatch(fetchAllTimetable({ ...filter }))
   }
 
-  const openAdd = () => { setForm(EMPTY); setModal('add') }
-  const openEdit = (entry) => { setForm(entry); setModal('edit') }
-  const closeModal = () => { setModal(null); setForm(EMPTY) }
+  const openAdd = (slot = null) => {
+    const defaults = {
+      ...EMPTY,
+      section: filter.section || '',
+      day: filter.day || 'Monday',
+      startTime: slot?.start || EMPTY.startTime,
+      endTime: slot?.end || EMPTY.endTime,
+    }
+    setForm(defaults)
+    setSelectedSlots(slot ? [slot] : [])
+    setModal('add')
+  }
 
-  const handleSlotChange = (slot) => {
-    setForm({ ...form, startTime: slot.start, endTime: slot.end })
+  const openEdit = (entry) => { setForm(entry); setSelectedSlots([]); setModal('edit') }
+  const closeModal = () => { setModal(null); setForm(EMPTY); setSelectedSlots([]) }
+
+  const handleSlotToggle = (slot) => {
+    setSelectedSlots((prev) => {
+      const exists = prev.some(item => item.start === slot.start && item.end === slot.end)
+      return exists ? prev.filter(item => !(item.start === slot.start && item.end === slot.end)) : [...prev, slot]
+    })
+  }
+
+  const toggleAllSlots = () => {
+    setSelectedSlots(prev => (prev.length === TIME_SLOTS.length ? [] : [...TIME_SLOTS]))
   }
 
   const handleSave = async () => {
     if (!form.subjectName || !form.section || !form.day) return toast.error('Please fill required fields')
+
+    const dataToSend = {
+      ...form,
+      year: '3rd Year',
+      session: '2025-26'
+    }
+
     setSaving(true)
     try {
       if (modal === 'edit') {
-        await api.put(`/timetable/${form._id}`, form)
+        await api.put(`/timetable/${form._id}`, dataToSend)
         toast.success('Entry updated')
       } else {
-        await api.post('/timetable', form)
-        toast.success('Entry created')
+        const slotsToSave = selectedSlots.length > 0 ? selectedSlots : [{ start: form.startTime, end: form.endTime }]
+        await Promise.all(
+          slotsToSave.map(slot =>
+            api.post('/timetable', {
+              ...dataToSend,
+              startTime: slot.start,
+              endTime: slot.end,
+            })
+          )
+        )
+
+        toast.success(slotsToSave.length === 1 ? 'Entry created' : `${slotsToSave.length} entries created`)
       }
+
       closeModal()
       dispatch(fetchAllTimetable({ session: '2025-26' }))
     } catch (err) {
@@ -115,10 +153,33 @@ export default function AdminTimetable() {
             <p className="text-slate-400 text-sm">Session 2025-26 • {filtered.length} entries</p>
           </div>
         </div>
-        <button onClick={openAdd} className="btn-primary flex items-center gap-2">
+        <button onClick={() => openAdd()} className="btn-primary flex items-center gap-2">
           <Plus size={16} />
           Add Entry
         </button>
+      </div>
+
+      <div className="glass-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-white font-semibold">Quick slot entry</h2>
+            <p className="text-slate-400 text-sm">Click any time slot to open its own form. You can also select multiple slots and save them together.</p>
+          </div>
+          <button onClick={() => openAdd()} className="btn-secondary">Open add form</button>
+        </div>
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+          {TIME_SLOTS.map(slot => (
+            <button
+              key={slot.label}
+              type="button"
+              onClick={() => openAdd(slot)}
+              className="rounded-2xl border border-slate-700 bg-slate-800/80 p-3 text-left transition-all hover:border-indigo-500/60 hover:bg-slate-800"
+            >
+              <div className="text-xs uppercase tracking-[0.18em] text-indigo-300">{slot.label}</div>
+              <p className="mt-1 text-sm text-slate-200">Open a dedicated form for this time slot</p>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Filters */}
@@ -254,22 +315,31 @@ export default function AdminTimetable() {
               {/* Time Slot Selection */}
               <div>
                 <label className="block text-xs text-slate-400 mb-2">Time Slot *</label>
-                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                  {TIME_SLOTS.map(slot => (
-                    <button
-                      key={slot.label}
-                      type="button"
-                      onClick={() => handleSlotChange(slot)}
-                      className={`p-2 text-sm rounded-lg border transition-all ${
-                        form.startTime === slot.start && form.endTime === slot.end
-                          ? 'bg-indigo-500/30 border-indigo-500 text-indigo-200'
-                          : 'border-slate-600 text-slate-400 hover:border-indigo-500/50 hover:text-slate-300'
-                      }`}
-                    >
-                      {slot.label}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-2 mb-2 text-xs text-slate-300">
+                  <button type="button" onClick={toggleAllSlots} className="btn-secondary px-3 py-1.5 text-xs">{selectedSlots.length === TIME_SLOTS.length ? 'Clear all' : 'Select all'}</button>
+                  <span>{selectedSlots.length > 0 ? `${selectedSlots.length} slot(s) selected` : 'Single slot mode'}</span>
                 </div>
+                <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
+                  {TIME_SLOTS.map(slot => {
+                    const active = selectedSlots.some(item => item.start === slot.start && item.end === slot.end)
+                    return (
+                      <button
+                        key={slot.label}
+                        type="button"
+                        onClick={() => handleSlotToggle(slot)}
+                        className={`p-2 text-sm rounded-lg border text-left transition-all ${
+                          active
+                            ? 'bg-indigo-500/30 border-indigo-500 text-indigo-100'
+                            : 'border-slate-600 text-slate-400 hover:border-indigo-500/50 hover:text-slate-300'
+                        }`}
+                      >
+                        <div className="font-medium">{slot.label}</div>
+                        <div className="text-[11px] text-slate-300">{active ? 'Selected for bulk save' : 'Click to add this slot'}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-slate-400 mt-2">Choose one slot for a single entry, or select multiple slots to save them together with the same section/day details.</p>
               </div>
 
               {/* Subject Name */}

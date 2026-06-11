@@ -5,6 +5,7 @@ import { logout } from '../store/slices/authSlice'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import toast from 'react-hot-toast'
+import TimetableReference from '../components/dashboard/TimetableReference'
 
 const SESSIONS = ['2024-25', '2025-26', '2026-27']
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year']
@@ -109,6 +110,9 @@ export default function ProfilePage() {
           </button>
         </div>
       </div>
+
+      {/* Timetable Reference */}
+      <TimetableReference />
 
       {/* Account */}
       <div className="glass-card p-6">

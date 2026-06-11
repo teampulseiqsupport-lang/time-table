@@ -6,7 +6,6 @@ import { getGreeting, getOngoingEntry, getUpcomingEntry, formatDate, getTodayIST
 import ClassCard from '../components/dashboard/ClassCard'
 import CountdownTimer from '../components/dashboard/CountdownTimer'
 import DayArc from '../components/dashboard/DayArc'
-import TimetableReference from '../components/dashboard/TimetableReference'
 
 export default function StudentDashboard() {
   const dispatch = useDispatch()
@@ -98,9 +97,6 @@ export default function StudentDashboard() {
       )}
 
       {/* Reference Timetable Section */}
-      {isToday && (
-        <TimetableReference />
-      )}
 
       {!holiday && (
         <>

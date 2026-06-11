@@ -10,8 +10,15 @@ router.get('/', async (req, res) => {
     const query = { isActive: true };
     if (session) query.session = session;
     
-    const sections = await Section.find(query).sort({ name: 1 });
-    res.json({ success: true, sections });
+    // Ensure we get fresh data by sorting by name
+    const sections = await Section.find(query).sort({ name: 1 }).lean();
+    
+    res.json({ 
+      success: true, 
+      sections,
+      count: sections.length,
+      query: { ...query, sessionParam: session }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

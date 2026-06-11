@@ -16,19 +16,39 @@ export default function RegisterPage() {
   const [sections, setSections] = useState([])
   const [sectionSearch, setSectionSearch] = useState('')
   const [sectionOpen, setSectionOpen] = useState(false)
+  const [loadingSections, setLoadingSections] = useState(true)
 
   useEffect(() => {
     const fetchSections = async () => {
+      setLoadingSections(true)
       try {
         const { data } = await api.get('/sections', { params: { session: '2025-26' } })
-        setSections(data.sections || [])
-      } catch {}
+        const sectionList = Array.isArray(data?.sections) ? data.sections : []
+        if (sectionList.length > 0) {
+          setSections(sectionList)
+          return
+        }
+
+        const fallback = await api.get('/sections')
+        setSections(Array.isArray(fallback.data?.sections) ? fallback.data.sections : [])
+      } catch (error) {
+        console.error('Failed to fetch sections for registration:', error)
+        try {
+          const fallback = await api.get('/sections')
+          setSections(Array.isArray(fallback.data?.sections) ? fallback.data.sections : [])
+        } catch {
+          setSections([])
+        }
+      } finally {
+        setLoadingSections(false)
+      }
     }
+
     fetchSections()
   }, [])
 
   const filteredSections = sections.filter(s =>
-    s.name.toLowerCase().includes(sectionSearch.toLowerCase())
+    (s?.name || '').toLowerCase().includes(sectionSearch.toLowerCase())
   )
 
   const handleSubmit = (e) => {
@@ -109,10 +129,12 @@ export default function RegisterPage() {
                     </div>
                   </div>
                   <div className="max-h-40 overflow-y-auto p-1">
-                    {filteredSections.length === 0 ? (
-                      <p className="text-slate-500 text-sm text-center py-3">No sections found</p>
+                    {loadingSections ? (
+                      <p className="text-slate-400 text-sm text-center py-3">Loading sections...</p>
+                    ) : filteredSections.length === 0 ? (
+                      <p className="text-slate-500 text-sm text-center py-3">No sections found for 2025-26</p>
                     ) : filteredSections.map(sec => (
-                      <button key={sec._id} type="button"
+                      <button key={sec._id || sec.name} type="button"
                         onClick={() => { setForm({ ...form, section: sec.name }); setSectionOpen(false); setSectionSearch('') }}
                         className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between hover:bg-indigo-500/10 transition-colors ${form.section === sec.name ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-300'}`}>
                         {sec.name}

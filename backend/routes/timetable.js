@@ -165,38 +165,57 @@ router.post('/upload', protect, adminOnly, upload.single('file'), async (req, re
 
       for (const row of rows) {
         try {
-          const sectionStr = row['Section'] || row['section'] || '';
+          const sectionStr = row['Section'] || row['section'] || row['CLASS'] || '';
           const sectionsArr = parseSections(sectionStr);
 
           if (!sectionsArr.length) continue;
 
-          const day = row['Day'] || row['day'] || '';
-          const subjectName = row['Subject'] || row['SubjectName'] || row['subject_name'] || '';
-          const subjectCode = row['Code'] || row['SubjectCode'] || row['subject_code'] || '';
-          const facultyName = row['Faculty'] || row['FacultyName'] || row['faculty'] || '';
-          const room = row['Room'] || row['room'] || '';
-          const block = row['Block'] || row['block'] || '';
-          const startTime = normalizeTime(row['StartTime'] || row['start_time'] || row['Start Time'] || '');
-          const endTime = normalizeTime(row['EndTime'] || row['end_time'] || row['End Time'] || '');
-          const type = row['Type'] || row['type'] || 'Theory';
-          const session = row['Session'] || row['session'] || req.body.session || '2024-25';
-          const year = row['Year'] || row['year'] || '';
+          const day = row['Day'] || row['day'] || row['DAY'] || '';
+          const subjectName = row['Subject'] || row['SubjectName'] || row['subject_name'] || row['SUBJECT'] || '';
+          const subjectCode = row['Code'] || row['SubjectCode'] || row['subject_code'] || row['CODE'] || '';
+          const facultyName = row['Faculty'] || row['FacultyName'] || row['faculty'] || row['FACULTY'] || '';
+          const room = row['Room'] || row['room'] || row['ROOM'] || '';
+          const block = row['Block'] || row['block'] || row['BLOCK'] || '';
+          const startTime = normalizeTime(row['StartTime'] || row['start_time'] || row['Start Time'] || row['START_TIME'] || '');
+          const endTime = normalizeTime(row['EndTime'] || row['end_time'] || row['End Time'] || row['END_TIME'] || '');
+          const type = row['Type'] || row['type'] || row['TYPE'] || 'Theory';
+          const session = row['Session'] || row['session'] || row['SESSION'] || req.body.session || '2025-26';
+          const year = row['Year'] || row['year'] || row['YEAR'] || req.body.year || '3rd Year';
 
           if (!day || !subjectName || !startTime || !endTime) continue;
 
           for (const section of sectionsArr) {
             results.sections.add(section);
 
-            // Auto-create section if not exists
+            // Auto-create section if not exists with proper session and year
             await Section.findOneAndUpdate(
-              { name: section, session },
-              { name: section, session, year, isActive: true },
+              { name: section.toUpperCase(), session: session.toString() },
+              { 
+                name: section.toUpperCase(), 
+                session: session.toString(), 
+                year: year.toString(), 
+                isActive: true 
+              },
               { upsert: true, new: true }
             );
 
             // Upsert timetable entry
-            const filter = { section, day, startTime, session };
-            const update = { section, day, subjectName, subjectCode, facultyName, room, block, startTime, endTime, type, session, year, isActive: true };
+            const filter = { section: section.toUpperCase(), day, startTime, session: session.toString() };
+            const update = { 
+              section: section.toUpperCase(), 
+              day, 
+              subjectName, 
+              subjectCode, 
+              facultyName, 
+              room, 
+              block, 
+              startTime, 
+              endTime, 
+              type, 
+              session: session.toString(), 
+              year: year.toString(), 
+              isActive: true 
+            };
 
             const existing = await Timetable.findOne(filter);
             if (existing) {
@@ -269,24 +288,33 @@ router.post('/upload', protect, adminOnly, upload.single('file'), async (req, re
 // @POST /api/timetable - Admin: manual entry
 router.post('/', protect, adminOnly, async (req, res) => {
   try {
-    const { section, day, startTime, session } = req.body;
+    const { section, day, startTime, session, year } = req.body;
+    
+    // Ensure year is set for 2025-26 session
+    const finalYear = year || '3rd Year';
+    const finalSession = session || '2025-26';
     
     // Auto-create section
-    if (section && session) {
+    if (section && finalSession) {
       await Section.findOneAndUpdate(
-        { name: section.toUpperCase(), session },
-        { name: section.toUpperCase(), session, isActive: true },
+        { name: section.toUpperCase(), session: finalSession },
+        { name: section.toUpperCase(), session: finalSession, year: finalYear, isActive: true },
         { upsert: true, new: true }
       );
     }
 
-    const existing = await Timetable.findOne({ section: section?.toUpperCase(), day, startTime, session });
+    const existing = await Timetable.findOne({ section: section?.toUpperCase(), day, startTime, session: finalSession });
     if (existing) {
-      const updated = await Timetable.findByIdAndUpdate(existing._id, req.body, { new: true });
+      const updated = await Timetable.findByIdAndUpdate(existing._id, { ...req.body, year: finalYear, session: finalSession }, { new: true });
       return res.json({ success: true, timetable: updated, message: 'Updated existing entry' });
     }
 
-    const timetable = await Timetable.create({ ...req.body, section: section?.toUpperCase() });
+    const timetable = await Timetable.create({ 
+      ...req.body, 
+      section: section?.toUpperCase(),
+      year: finalYear,
+      session: finalSession
+    });
     res.status(201).json({ success: true, timetable });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -299,7 +327,14 @@ router.put('/:id', protect, adminOnly, async (req, res) => {
     const original = await Timetable.findById(req.params.id);
     if (!original) return res.status(404).json({ success: false, message: 'Not found' });
 
-    const updated = await Timetable.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    // Ensure year is set for updates
+    const updateData = {
+      ...req.body,
+      year: req.body.year || original.year || '3rd Year',
+      session: req.body.session || original.session || '2025-26'
+    };
+
+    const updated = await Timetable.findByIdAndUpdate(req.params.id, updateData, { new: true });
 
     // Handle room change notification
     if (req.body.room && req.body.room !== original.room) {

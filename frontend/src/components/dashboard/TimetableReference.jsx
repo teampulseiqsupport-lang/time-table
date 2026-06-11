@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { FileSpreadsheet, Download, Info, Calendar, User, AlertCircle } from 'lucide-react'
+import { FileSpreadsheet, Download, AlertCircle, Calendar, User } from 'lucide-react'
 import api from '../../services/api'
+import toast from 'react-hot-toast'
 
 export default function TimetableReference() {
   const [refFile, setRefFile] = useState(null)
@@ -29,12 +30,19 @@ export default function TimetableReference() {
     if (!refFile) return
     setDownloadLoading(true)
     try {
-      // For now, show a message that file is available
-      // In production, you would implement actual download
-      const message = `Official reference timetable: ${refFile.fileName}\n\nUploaded: ${new Date(refFile.uploadDate).toLocaleString('en-IN')}\nSize: ${refFile.fileSize}`
-      alert(message)
+      const response = await api.get(`/public/reference-files/${refFile.fileName}`, { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', refFile.fileName || 'timetable-reference.xlsx')
+      document.body.appendChild(link)
+      link.click()
+      link.parentNode.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      toast.success('Reference file downloaded successfully')
     } catch (err) {
       console.error('Download error:', err)
+      toast.error('Failed to download file. Please contact admin.')
     } finally {
       setDownloadLoading(false)
     }
@@ -115,3 +123,4 @@ export default function TimetableReference() {
     </div>
   )
 }
+
