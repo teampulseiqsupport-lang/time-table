@@ -29,6 +29,11 @@ export default function ClassCard({
   const completed = forceCompleted || (showRealtimeStatus && currentMinutes >= endMinutes)
   const futureDetailsOnly = !showRealtimeStatus && !forceCompleted
   const progress = ongoing && showProgress ? getClassProgress(entry) : 0
+
+  // Minutes remaining/elapsed for richer ongoing/upcoming context
+  const minutesRemaining = ongoing ? Math.max(0, endMinutes - currentMinutes) : null
+  const minutesUntilStart = upcoming ? Math.max(0, startMinutes - currentMinutes) : null
+
   const cardStatusClass = ongoing
     ? 'ongoing-card status-card-ongoing p-5'
     : upcoming
@@ -39,17 +44,17 @@ export default function ClassCard({
 
   if (entry.type === 'Lunch') {
     return (
-      <div className="glass-card p-4 border-orange-500/20 bg-orange-500/5">
+      <div className="glass-card p-4 border-orange-500/20 bg-orange-500/5 transition-all duration-300 hover:border-orange-500/30">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0">
             <Coffee size={20} className="text-orange-400" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="font-semibold text-orange-300">Lunch Break</p>
             <p className="text-slate-400 text-sm font-mono">{entry.startTime} - {entry.endTime}</p>
           </div>
           {!futureDetailsOnly && (
-            <span className="ml-auto badge" style={forceCompleted ? completedBadgeStyle : breakBadgeStyle}>
+            <span className="ml-auto badge flex-shrink-0" style={forceCompleted ? completedBadgeStyle : breakBadgeStyle}>
               {forceCompleted ? 'Completed' : 'Break'}
             </span>
           )}
@@ -60,16 +65,16 @@ export default function ClassCard({
 
   if (entry.isCancelled) {
     return (
-      <div className="glass-card p-4 opacity-60 border-red-500/20">
+      <div className="glass-card p-4 opacity-60 border-red-500/20 transition-all duration-300 hover:opacity-75">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center flex-shrink-0">
             <XCircle size={20} className="text-red-400" />
           </div>
-          <div className="flex-1">
-            <p className="font-semibold text-red-300 line-through">{entry.subjectName}</p>
-            <p className="text-slate-500 text-xs">Cancelled - {entry.cancellationReason || 'No reason given'}</p>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-red-300 line-through truncate">{entry.subjectName}</p>
+            <p className="text-slate-500 text-xs mt-0.5 truncate">Cancelled - {entry.cancellationReason || 'No reason given'}</p>
           </div>
-          <span className="font-mono text-xs text-slate-500">{entry.startTime}</span>
+          <span className="font-mono text-xs text-slate-500 flex-shrink-0">{entry.startTime}</span>
         </div>
       </div>
     )
@@ -87,7 +92,7 @@ export default function ClassCard({
       )}
 
       <div className="flex items-start gap-4">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${ongoing ? 'bg-emerald-500/20' : 'bg-indigo-500/15'}`}>
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors duration-300 ${ongoing ? 'bg-emerald-500/20' : 'bg-indigo-500/15'}`}>
           {entry.type === 'Lab'
             ? <Beaker size={18} className={ongoing ? 'text-emerald-400' : 'text-amber-400'} />
             : <BookOpen size={18} className={ongoing ? 'text-emerald-400' : 'text-indigo-400'} />
@@ -146,6 +151,19 @@ export default function ClassCard({
                   <span>{entry.facultyName}</span>
                 </div>
               )}
+
+              {ongoing && minutesRemaining !== null && (
+                <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>{minutesRemaining} min left</span>
+                </div>
+              )}
+
+              {upcoming && minutesUntilStart !== null && minutesUntilStart <= 30 && (
+                <div className="flex items-center gap-1.5 text-xs text-cyan-400 font-medium">
+                  <span>Starts in {minutesUntilStart} min</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -153,6 +171,9 @@ export default function ClassCard({
             <div className="flex items-center gap-3 mt-1">
               <span className="text-xs font-mono text-slate-500">{entry.startTime}</span>
               {entry.room && <span className="text-xs text-slate-500">{entry.room}</span>}
+              {ongoing && minutesRemaining !== null && (
+                <span className="text-xs text-emerald-400 font-medium">{minutesRemaining}m left</span>
+              )}
             </div>
           )}
         </div>

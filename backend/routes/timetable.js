@@ -44,6 +44,17 @@ const toWorkbookPreview = (buffer) => {
   });
 };
 
+const getReferenceBuffer = (refFile) => {
+  if (refFile?.fileData?.length) return refFile.fileData;
+
+  if (refFile?.storedFileName) {
+    const filePath = path.join(__dirname, '../public/reference-files', refFile.storedFileName);
+    if (fs.existsSync(filePath)) return fs.readFileSync(filePath);
+  }
+
+  return null;
+};
+
 // Parse section ranges like "3A,3B,3C" or "3A-3F"
 const parseSections = (sectionStr) => {
   if (!sectionStr) return [];
@@ -308,7 +319,7 @@ router.post('/upload', protect, adminOnly, upload.single('file'), async (req, re
     }
 
     // Save reference file metadata
-    try {
+    {
       const publicDir = path.join(__dirname, '../public/reference-files');
       if (!fs.existsSync(publicDir)) {
         fs.mkdirSync(publicDir, { recursive: true });
@@ -319,34 +330,31 @@ router.post('/upload', protect, adminOnly, upload.single('file'), async (req, re
       const fileName = `timetable-reference-${timestamp}${fileExtension}`;
       const filePath = path.join(publicDir, fileName);
 
-      // Save file to disk
-      fs.writeFileSync(filePath, req.file.buffer);
-
       // Archive previous references
       const referenceSession = req.body.session || '2025-26';
       const referenceYear = req.body.year || '3rd Year';
-      await ReferenceFile.updateMany({ session: referenceSession, status: 'active' }, { status: 'archived' });
+      await ReferenceFile.updateMany(
+        { session: referenceSession, status: 'active' },
+        { status: 'archived', isActive: false }
+      );
 
       // Save reference metadata to database
-      const refFile = await ReferenceFile.create({
+      await ReferenceFile.create({
         fileName: req.file.originalname,
         storedFileName: fileName,
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
-        fileData: req.file.buffer,
+        fileData: Buffer.from(req.file.buffer),
         uploadedBy: req.user.name || 'Admin',
         session: referenceSession,
         year: referenceYear,
         status: 'active',
+        isActive: true,
         description: `Official timetable reference uploaded for ${referenceSession} (${referenceYear})`
       });
 
       console.log('✅ Reference file saved:', fileName);
-    } catch (refErr) {
-      console.error('Reference file save error (non-critical):', refErr);
-      // Don't fail the upload if reference save fails
     }
-
     // Notify all students about timetable update
     sendTimetableUpdateNotification();
 
@@ -431,11 +439,35 @@ router.put('/:id', protect, adminOnly, async (req, res) => {
   }
 });
 
-// @DELETE /api/timetable/:id - Admin: delete entry
+// @DELETE /api/timetable/:id - Admin: soft delete entry (sets isActive: false)
 router.delete('/:id', protect, adminOnly, async (req, res) => {
   try {
-    await Timetable.findByIdAndUpdate(req.params.id, { isActive: false });
-    res.json({ success: true, message: 'Entry deleted' });
+    const entry = await Timetable.findByIdAndUpdate(
+      req.params.id,
+      { isActive: false },
+      { new: true }
+    );
+    
+    if (!entry) {
+      return res.status(404).json({ success: false, message: 'Timetable entry not found' });
+    }
+    
+    res.json({ success: true, message: 'Entry archived', timetable: entry });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @DELETE /api/timetable/:id/permanent - Admin: permanently delete entry
+router.delete('/:id/permanent', protect, adminOnly, async (req, res) => {
+  try {
+    const entry = await Timetable.findByIdAndDelete(req.params.id);
+    
+    if (!entry) {
+      return res.status(404).json({ success: false, message: 'Timetable entry not found' });
+    }
+    
+    res.json({ success: true, message: 'Entry permanently deleted', deletedEntry: entry });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -486,55 +518,11 @@ router.get('/reference/info', async (req, res) => {
         session: refFile.session,
         year: refFile.year,
         description: refFile.description,
-        previewUrl: `/api/timetable/reference/${refFile._id}/preview`,
-        downloadUrl: `/api/timetable/reference/${refFile._id}/download`
+        previewUrl: `/timetable/reference/${refFile._id}/preview`,
+        downloadUrl: `/timetable/reference/${refFile._id}/download`
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// @GET /api/timetable/reference/:id/preview - Preview uploaded Excel as JSON
-router.get('/reference/:id/preview', protect, async (req, res) => {
-  try {
-    const refFile = await ReferenceFile.findOne({
-      _id: req.params.id,
-      isActive: true
-    }).select('+fileData');
-
-    if (!refFile || !refFile.fileData) {
-      return res.status(404).json({ success: false, message: 'Reference file not found' });
-    }
-
-    res.json({
-      success: true,
-      fileName: refFile.fileName,
-      sheets: toWorkbookPreview(refFile.fileData)
-    });
-  } catch (error) {
-    console.error('Reference preview error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// @GET /api/timetable/reference/:id/download - Download uploaded Excel
-router.get('/reference/:id/download', protect, async (req, res) => {
-  try {
-    const refFile = await ReferenceFile.findOne({
-      _id: req.params.id,
-      isActive: true
-    }).select('+fileData');
-
-    if (!refFile || !refFile.fileData) {
-      return res.status(404).json({ success: false, message: 'Reference file not found' });
-    }
-
-    res.setHeader('Content-Type', refFile.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(refFile.fileName || 'timetable-reference.xlsx')}"`);
-    res.send(refFile.fileData);
-  } catch (error) {
-    console.error('Reference download error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -559,6 +547,54 @@ router.get('/reference/history', protect, adminOnly, async (req, res) => {
       }))
     });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @GET /api/timetable/reference/:id/preview - Preview uploaded Excel as JSON (MUST come after /reference/history)
+router.get('/reference/:id/preview', protect, async (req, res) => {
+  try {
+    const refFile = await ReferenceFile.findOne({
+      _id: req.params.id,
+      isActive: true
+    }).select('+fileData');
+
+    const fileBuffer = getReferenceBuffer(refFile);
+
+    if (!refFile || !fileBuffer) {
+      return res.status(404).json({ success: false, message: 'Reference file not found' });
+    }
+
+    res.json({
+      success: true,
+      fileName: refFile.fileName,
+      sheets: toWorkbookPreview(fileBuffer)
+    });
+  } catch (error) {
+    console.error('Reference preview error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @GET /api/timetable/reference/:id/download - Download uploaded Excel (MUST come after /reference/history)
+router.get('/reference/:id/download', protect, async (req, res) => {
+  try {
+    const refFile = await ReferenceFile.findOne({
+      _id: req.params.id,
+      isActive: true
+    }).select('+fileData');
+
+    const fileBuffer = getReferenceBuffer(refFile);
+
+    if (!refFile || !fileBuffer) {
+      return res.status(404).json({ success: false, message: 'Reference file not found' });
+    }
+
+    res.setHeader('Content-Type', refFile.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(refFile.fileName || 'timetable-reference.xlsx')}"`);
+    res.send(fileBuffer);
+  } catch (error) {
+    console.error('Reference download error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

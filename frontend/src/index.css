@@ -363,6 +363,12 @@ select.input-field option {
   color: #F8FAFC;
 }
 
+.time-picker-field {
+  padding: 10px 12px;
+  padding-left: 12px;
+  text-align: center;
+}
+
 /* Class time arc */
 .time-arc-container {
   position: relative;

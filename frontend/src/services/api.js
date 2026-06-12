@@ -7,9 +7,15 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+const normalizeApiPath = (url) => {
+  if (typeof url !== 'string') return url
+  return url.startsWith('/api/') ? url.slice(4) : url
+}
+
 // Request interceptor — attach token
 api.interceptors.request.use(
   (config) => {
+    config.url = normalizeApiPath(config.url)
     const token = localStorage.getItem('token')
     if (token) config.headers.Authorization = `Bearer ${token}`
     return config

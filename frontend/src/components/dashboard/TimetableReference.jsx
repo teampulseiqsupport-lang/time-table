@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { FileSpreadsheet, Download, AlertCircle, Calendar, User, Eye, X } from 'lucide-react'
+import { FileSpreadsheet, Download, AlertCircle, Calendar, User, Eye, X, HardDrive } from 'lucide-react'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
@@ -32,19 +32,20 @@ export default function TimetableReference() {
     if (!refFile) return
     setDownloadLoading(true)
     try {
-      const response = await api.get(refFile.downloadUrl || `/timetable/reference/${refFile._id}/download`, { responseType: 'blob' })
-      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const url = `${refFile.downloadUrl}`.startsWith('/') ? refFile.downloadUrl : `/timetable/reference/${refFile._id}/download`
+      const response = await api.get(url, { responseType: 'blob' })
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]))
       const link = document.createElement('a')
-      link.href = url
+      link.href = blobUrl
       link.setAttribute('download', refFile.fileName || 'timetable-reference.xlsx')
       document.body.appendChild(link)
       link.click()
       link.parentNode.removeChild(link)
-      window.URL.revokeObjectURL(url)
-      toast.success('Reference file downloaded successfully')
+      window.URL.revokeObjectURL(blobUrl)
+      toast.success('✅ Reference file downloaded successfully')
     } catch (err) {
       console.error('Download error:', err)
-      toast.error('Failed to download file. Please contact admin.')
+      toast.error(err.response?.status === 404 ? 'File not found' : 'Failed to download file. Please contact admin.')
     } finally {
       setDownloadLoading(false)
     }
@@ -54,11 +55,12 @@ export default function TimetableReference() {
     if (!refFile) return
     setPreviewLoading(true)
     try {
-      const { data } = await api.get(refFile.previewUrl || `/timetable/reference/${refFile._id}/preview`)
+      const url = `${refFile.previewUrl}`.startsWith('/') ? refFile.previewUrl : `/timetable/reference/${refFile._id}/preview`
+      const { data } = await api.get(url)
       setPreview(data)
     } catch (err) {
       console.error('Preview error:', err)
-      toast.error('Failed to open reference file preview')
+      toast.error(err.response?.status === 404 ? 'File not found' : 'Failed to open reference file preview')
     } finally {
       setPreviewLoading(false)
     }
@@ -88,52 +90,60 @@ export default function TimetableReference() {
   }
 
   return (
-    <div className="glass-card p-5 border-emerald-500/20 bg-emerald-500/5">
+    <div className="glass-card p-5 border-emerald-500/20 bg-emerald-500/5 transition-all duration-300 hover:border-emerald-500/30">
       <div className="flex items-start justify-between gap-4 mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
             <FileSpreadsheet size={20} className="text-emerald-400" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-emerald-300 font-semibold">📋 Official Timetable Reference</p>
             <p className="text-slate-400 text-xs mt-0.5">Authorized source - Your timetable is set according to this file</p>
           </div>
         </div>
       </div>
 
-      <div className="space-y-3 mb-4">
-        <div className="flex items-center gap-2 text-slate-300 text-sm">
+      <div className="grid sm:grid-cols-2 gap-3 mb-4">
+        <div className="flex items-center gap-2 text-slate-300 text-sm min-w-0">
           <FileSpreadsheet size={14} className="text-cyan-400 flex-shrink-0" />
-          <span><strong>File:</strong> {refFile.fileName}</span>
+          <span className="truncate"><strong className="text-slate-200">File:</strong> {refFile.fileName}</span>
         </div>
-        
+
         <div className="flex items-center gap-2 text-slate-300 text-sm">
-          <span><strong>Size:</strong> {refFile.fileSize}</span>
+          <HardDrive size={14} className="text-slate-500 flex-shrink-0" />
+          <span><strong className="text-slate-200">Size:</strong> {refFile.fileSize}</span>
         </div>
 
         <div className="flex items-center gap-2 text-slate-300 text-sm">
           <Calendar size={14} className="text-indigo-400 flex-shrink-0" />
-          <span><strong>Last Updated:</strong> {new Date(refFile.uploadDate).toLocaleDateString('en-IN')} at {new Date(refFile.uploadDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+          <span><strong className="text-slate-200">Last Updated:</strong> {new Date(refFile.uploadDate).toLocaleDateString('en-IN')} at {new Date(refFile.uploadDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
         </div>
 
-        <div className="flex items-center gap-2 text-slate-300 text-sm">
+        <div className="flex items-center gap-2 text-slate-300 text-sm min-w-0">
           <User size={14} className="text-purple-400 flex-shrink-0" />
-          <span><strong>Uploaded By:</strong> {refFile.uploadedBy || 'Administrator'}</span>
+          <span className="truncate"><strong className="text-slate-200">Uploaded By:</strong> {refFile.uploadedBy || 'Administrator'}</span>
         </div>
       </div>
 
       <div className="pt-3 border-t border-slate-700/50">
-        <p className="text-slate-400 text-xs mb-3">
-          ✅ <strong>This is the authorized timetable reference.</strong> All your class timings, rooms, and schedules are set according to this official file. If you have any discrepancies in your timetable, refer to this document.
+        <p className="text-slate-400 text-xs mb-3 leading-relaxed">
+          ✅ <strong className="text-slate-300">This is the authorized timetable reference.</strong> All your class timings, rooms, and schedules are set according to this official file. If you have any discrepancies in your timetable, refer to this document.
         </p>
-        
+
         <div className="grid sm:grid-cols-2 gap-2">
           <button
             onClick={handlePreview}
             disabled={previewLoading}
             className="btn-secondary w-full flex items-center justify-center gap-2 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Eye size={16} />
+            {previewLoading ? (
+              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            ) : (
+              <Eye size={16} />
+            )}
             {previewLoading ? 'Opening...' : 'View Reference'}
           </button>
           <button
@@ -141,21 +151,28 @@ export default function TimetableReference() {
             disabled={downloadLoading}
             className="btn-secondary w-full flex items-center justify-center gap-2 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Download size={16} />
+            {downloadLoading ? (
+              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            ) : (
+              <Download size={16} />
+            )}
             {downloadLoading ? 'Downloading...' : 'Download File'}
           </button>
         </div>
       </div>
 
       {preview && (
-        <div className="fixed inset-0 z-[1000] bg-black/70 backdrop-blur-sm p-4 flex items-center justify-center">
+        <div className="fixed inset-0 z-[1000] bg-black/70 backdrop-blur-sm p-4 flex items-center justify-center animate-slide-up">
           <div className="w-full max-w-6xl max-h-[90vh] glass-card overflow-hidden flex flex-col">
             <div className="p-4 border-b border-slate-700/70 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-white font-semibold">{preview.fileName}</p>
+              <div className="min-w-0">
+                <p className="text-white font-semibold truncate">{preview.fileName}</p>
                 <p className="text-slate-500 text-xs">Showing first 100 rows per sheet</p>
               </div>
-              <button onClick={() => setPreview(null)} className="p-2 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-300">
+              <button onClick={() => setPreview(null)} className="p-2 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-300 transition-colors duration-150 flex-shrink-0">
                 <X size={18} />
               </button>
             </div>
@@ -195,4 +212,3 @@ export default function TimetableReference() {
     </div>
   )
 }
-
