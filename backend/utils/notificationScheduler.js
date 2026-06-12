@@ -1,4 +1,5 @@
 const moment = require('moment-timezone');
+const admin = require('firebase-admin');
 const User = require('../models/User');
 const Timetable = require('../models/Timetable');
 const Notification = require('../models/Notification');
@@ -306,25 +307,42 @@ const sendFCMNotification = async (tokens, title, body, data = {}) => {
       const batch = tokens.slice(i, i + batchSize);
 
       try {
-        const response = await firebaseAdmin.messaging().sendMulticast({
-          ...message,
-          tokens: batch
+        // Get the messaging service from the Firebase app
+        const messaging = admin.messaging(firebaseAdmin);
+        
+        // Send individual messages instead of using sendMulticast due to Firebase Admin v14+ compatibility
+        const promises = batch.map(token =>
+          messaging.send({
+            ...message,
+            token
+          }).catch(err => {
+            console.error(`FCM send failed for token: ${err.message}`);
+            return { success: false, token, error: err };
+          })
+        );
+
+        const results = await Promise.allSettled(promises);
+
+        const successCount = results.filter(r => r.status === 'fulfilled' && r.value?.success !== false).length;
+        const failureCount = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value?.success === false)).length;
+
+        console.log(`FCM sent to ${successCount} devices. Failed: ${failureCount}`);
+
+        // Collect invalid tokens from failed sends
+        const invalidTokens = [];
+        results.forEach((result, idx) => {
+          if (result.status === 'rejected') {
+            invalidTokens.push(batch[idx]);
+          } else if (result.status === 'fulfilled' && result.value?.success === false) {
+            invalidTokens.push(result.value.token);
+          }
         });
 
-        console.log(`FCM sent to ${response.successCount} devices. Failed: ${response.failureCount}`);
-
-        if (response.failureCount > 0) {
-          const invalidTokens = [];
-          response.responses.forEach((result, idx) => {
-            if (!result.success) invalidTokens.push(batch[idx]);
-          });
-
-          if (invalidTokens.length > 0) {
-            await User.updateMany(
-              { fcmToken: { $in: invalidTokens } },
-              { $set: { fcmToken: null } }
-            );
-          }
+        if (invalidTokens.length > 0) {
+          await User.updateMany(
+            { fcmToken: { $in: invalidTokens } },
+            { $set: { fcmToken: null } }
+          );
         }
       } catch (error) {
         console.error('FCM batch send error:', error);

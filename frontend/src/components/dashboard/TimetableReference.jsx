@@ -165,38 +165,59 @@ export default function TimetableReference() {
       </div>
 
       {preview && (
-        <div className="fixed inset-0 z-[1000] bg-black/70 backdrop-blur-sm p-4 flex items-center justify-center animate-slide-up">
-          <div className="w-full max-w-6xl max-h-[90vh] glass-card overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-slate-700/70 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-white font-semibold truncate">{preview.fileName}</p>
-                <p className="text-slate-500 text-xs">Showing first 100 rows per sheet</p>
-              </div>
-              <button onClick={() => setPreview(null)} className="p-2 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-300 transition-colors duration-150 flex-shrink-0">
-                <X size={18} />
+        <div className="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-sm p-4 flex items-center justify-center">
+          <div className="w-full max-w-5xl max-h-[85vh] bg-white text-black flex flex-col overflow-hidden rounded-xl shadow-2xl">
+            <div className="flex items-center justify-between gap-3 p-4 border-b border-gray-300 bg-gray-100 sticky top-0 z-10">
+              <p className="font-bold text-gray-800 text-lg">{preview.fileName}</p>
+              <button onClick={() => setPreview(null)} className="p-2 hover:bg-gray-300 rounded transition-colors">
+                <X size={24} className="text-gray-700" />
               </button>
             </div>
-            <div className="overflow-auto p-4 space-y-5">
-              {preview.sheets?.map(sheet => (
-                <div key={sheet.sheetName}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-cyan-300 font-semibold">{sheet.sheetName}</h3>
-                    <span className="text-xs text-slate-500">{sheet.totalRows} rows</span>
+            <div className="overflow-auto flex-1">
+              {preview.sheets?.map((sheet) => (
+                <div key={sheet.sheetName} className="p-6">
+                  <div className="mb-5 pb-3 border-b border-gray-300">
+                    <h3 className="font-bold text-gray-800 text-lg">{sheet.sheetName}</h3>
                   </div>
-                  <div className="overflow-auto rounded-xl border border-slate-700/70">
-                    <table className="data-table min-w-max">
+                  <div className="overflow-auto border border-gray-300 rounded">
+                    <table style={{ borderCollapse: 'collapse' }} className="w-full">
                       <thead>
-                        <tr>
-                          {(sheet.headers?.length ? sheet.headers : ['Column']).map((header, index) => (
-                            <th key={`${sheet.sheetName}-h-${index}`}>{header || `Column ${index + 1}`}</th>
+                        <tr style={{ backgroundColor: '#d0d0d0' }}>
+                          {sheet.headers?.map((header, index) => (
+                            <th 
+                              key={`${sheet.sheetName}-h-${index}`} 
+                              style={{ 
+                                border: '1px solid #999',
+                                padding: '10px 14px',
+                                textAlign: 'left',
+                                fontWeight: 'bold',
+                                backgroundColor: '#d0d0d0'
+                              }}
+                              className="text-gray-800 text-sm"
+                            >
+                              {header || ''}
+                            </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {sheet.rows?.map((row, rowIndex) => (
-                          <tr key={`${sheet.sheetName}-r-${rowIndex}`}>
-                            {(sheet.headers?.length ? sheet.headers : row).map((_, cellIndex) => (
-                              <td key={`${sheet.sheetName}-${rowIndex}-${cellIndex}`}>{row[cellIndex] || ''}</td>
+                          <tr 
+                            key={`${sheet.sheetName}-r-${rowIndex}`}
+                            style={{ backgroundColor: rowIndex % 2 === 0 ? '#ffffff' : '#f9f9f9' }}
+                          >
+                            {row?.map((cell, cellIndex) => (
+                              <td 
+                                key={`${sheet.sheetName}-${rowIndex}-${cellIndex}`}
+                                style={{ 
+                                  border: '1px solid #ccc',
+                                  padding: '10px 14px',
+                                  textAlign: 'left'
+                                }}
+                                className="text-gray-800 text-sm"
+                              >
+                                {cell || ''}
+                              </td>
                             ))}
                           </tr>
                         ))}
