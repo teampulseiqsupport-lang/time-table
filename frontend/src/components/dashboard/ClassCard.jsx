@@ -1,9 +1,33 @@
 import React from 'react'
 import { Clock, MapPin, User, BookOpen, Beaker, Coffee, XCircle } from 'lucide-react'
-import { isOngoing, getClassProgress } from '../../utils/time'
+import { getClassProgress, getCurrentISTMinutes, timeToMinutes } from '../../utils/time'
 
-export default function ClassCard({ entry, showProgress = false, compact = false }) {
-  const ongoing = isOngoing(entry)
+const completedBadgeStyle = {
+  background: 'rgba(100,116,139,0.15)',
+  color: '#CBD5E1',
+  border: '1px solid rgba(148,163,184,0.2)'
+}
+
+const breakBadgeStyle = {
+  background: 'rgba(249,115,22,0.1)',
+  color: '#FB923C',
+  border: '1px solid rgba(249,115,22,0.2)'
+}
+
+export default function ClassCard({
+  entry,
+  showProgress = false,
+  compact = false,
+  showRealtimeStatus = false,
+  forceCompleted = false
+}) {
+  const currentMinutes = showRealtimeStatus ? getCurrentISTMinutes() : null
+  const startMinutes = showRealtimeStatus ? timeToMinutes(entry.startTime) : null
+  const endMinutes = showRealtimeStatus ? timeToMinutes(entry.endTime) : null
+  const ongoing = showRealtimeStatus && currentMinutes >= startMinutes && currentMinutes < endMinutes
+  const upcoming = showRealtimeStatus && currentMinutes < startMinutes
+  const completed = forceCompleted || (showRealtimeStatus && currentMinutes >= endMinutes)
+  const futureDetailsOnly = !showRealtimeStatus && !forceCompleted
   const progress = ongoing && showProgress ? getClassProgress(entry) : 0
 
   if (entry.type === 'Lunch') {
@@ -15,11 +39,13 @@ export default function ClassCard({ entry, showProgress = false, compact = false
           </div>
           <div>
             <p className="font-semibold text-orange-300">Lunch Break</p>
-            <p className="text-slate-400 text-sm font-mono">{entry.startTime} — {entry.endTime}</p>
+            <p className="text-slate-400 text-sm font-mono">{entry.startTime} - {entry.endTime}</p>
           </div>
-          <span className="ml-auto badge" style={{ background: 'rgba(249,115,22,0.1)', color: '#FB923C', border: '1px solid rgba(249,115,22,0.2)' }}>
-            🍽️ Break
-          </span>
+          {!futureDetailsOnly && (
+            <span className="ml-auto badge" style={forceCompleted ? completedBadgeStyle : breakBadgeStyle}>
+              {forceCompleted ? 'Completed' : 'Break'}
+            </span>
+          )}
         </div>
       </div>
     )
@@ -34,7 +60,7 @@ export default function ClassCard({ entry, showProgress = false, compact = false
           </div>
           <div className="flex-1">
             <p className="font-semibold text-red-300 line-through">{entry.subjectName}</p>
-            <p className="text-slate-500 text-xs">Cancelled — {entry.cancellationReason || 'No reason given'}</p>
+            <p className="text-slate-500 text-xs">Cancelled - {entry.cancellationReason || 'No reason given'}</p>
           </div>
           <span className="font-mono text-xs text-slate-500">{entry.startTime}</span>
         </div>
@@ -44,7 +70,6 @@ export default function ClassCard({ entry, showProgress = false, compact = false
 
   return (
     <div className={`relative overflow-hidden transition-all duration-300 ${ongoing ? 'ongoing-card p-5' : 'glass-card p-4 hover:border-indigo-500/30'}`}>
-      {/* Progress bar for ongoing */}
       {ongoing && (
         <div className="absolute bottom-0 left-0 h-0.5 bg-emerald-500/30 w-full">
           <div
@@ -55,7 +80,6 @@ export default function ClassCard({ entry, showProgress = false, compact = false
       )}
 
       <div className="flex items-start gap-4">
-        {/* Icon */}
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${ongoing ? 'bg-emerald-500/20' : 'bg-indigo-500/15'}`}>
           {entry.type === 'Lab'
             ? <Beaker size={18} className={ongoing ? 'text-emerald-400' : 'text-amber-400'} />
@@ -63,7 +87,6 @@ export default function ClassCard({ entry, showProgress = false, compact = false
           }
         </div>
 
-        {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
@@ -82,9 +105,17 @@ export default function ClassCard({ entry, showProgress = false, compact = false
                   LIVE
                 </span>
               )}
-              <span className={`badge ${entry.type === 'Lab' ? 'badge-lab' : 'badge-theory'}`}>
-                {entry.type}
-              </span>
+              {upcoming && (
+                <span className="badge badge-upcoming">Upcoming</span>
+              )}
+              {completed && (
+                <span className="badge" style={completedBadgeStyle}>Completed</span>
+              )}
+              {showRealtimeStatus && (
+                <span className={`badge ${entry.type === 'Lab' ? 'badge-lab' : 'badge-theory'}`}>
+                  {entry.type}
+                </span>
+              )}
             </div>
           </div>
 
@@ -92,7 +123,7 @@ export default function ClassCard({ entry, showProgress = false, compact = false
             <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
               <div className="flex items-center gap-1.5 text-xs text-slate-400">
                 <Clock size={12} className="text-slate-500" />
-                <span className="font-mono">{entry.startTime} — {entry.endTime}</span>
+                <span className="font-mono">{entry.startTime} - {entry.endTime}</span>
               </div>
 
               {(entry.room || entry.block) && (

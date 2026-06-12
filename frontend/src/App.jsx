@@ -153,6 +153,7 @@ export default function App() {
 
         {/* Student */}
         <Route path="/" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+          <Route path="student/dashboard" element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<StudentDashboard />} />
           <Route path="weekly" element={<WeeklyView />} />
           <Route path="calendar" element={<CalendarView />} />

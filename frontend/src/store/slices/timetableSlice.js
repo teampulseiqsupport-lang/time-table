@@ -75,6 +75,7 @@ const timetableSlice = createSlice({
     holiday: null,
     currentDate: null,
     currentDay: null,
+    showRealtimeStatus: false,
     view: 'today', // 'today' | 'weekly'
     selectedDate: null,
   },
@@ -92,6 +93,7 @@ const timetableSlice = createSlice({
         state.holiday = action.payload.holiday || null
         state.currentDate = action.payload.date
         state.currentDay = action.payload.day
+        state.showRealtimeStatus = Boolean(action.payload.showRealtimeStatus)
       })
       .addCase(fetchTimetable.rejected, (state, action) => {
         state.loading = false

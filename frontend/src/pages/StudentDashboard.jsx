@@ -10,7 +10,7 @@ import DayArc from '../components/dashboard/DayArc'
 export default function StudentDashboard() {
   const dispatch = useDispatch()
   const { user } = useSelector(s => s.auth)
-  const { entries, loading, holiday, currentDate } = useSelector(s => s.timetable)
+  const { entries, loading, holiday, currentDate, showRealtimeStatus } = useSelector(s => s.timetable)
   const [selectedDate, setSelectedDate] = useState(getTodayIST())
   const [tick, setTick] = useState(0)
 
@@ -18,16 +18,23 @@ export default function StudentDashboard() {
     dispatch(fetchTimetable(selectedDate))
   }, [selectedDate, dispatch])
 
-  // Re-render every minute to update ongoing/upcoming state
   useEffect(() => {
+    if (!showRealtimeStatus) return undefined
     const interval = setInterval(() => setTick(t => t + 1), 60000)
     return () => clearInterval(interval)
-  }, [])
+  }, [showRealtimeStatus])
 
-  const ongoingClass = useMemo(() => getOngoingEntry(entries), [entries, tick])
-  const upcomingClass = useMemo(() => getUpcomingEntry(entries), [entries, tick])
+  const ongoingClass = useMemo(
+    () => showRealtimeStatus ? getOngoingEntry(entries) : null,
+    [entries, tick, showRealtimeStatus]
+  )
+  const upcomingClass = useMemo(
+    () => showRealtimeStatus ? getUpcomingEntry(entries) : null,
+    [entries, tick, showRealtimeStatus]
+  )
 
   const isToday = selectedDate === getTodayIST()
+  const isPastDate = selectedDate < getTodayIST()
 
   const changeDate = (delta) => {
     const d = new Date(selectedDate)
@@ -101,7 +108,7 @@ export default function StudentDashboard() {
       {!holiday && (
         <>
           {/* Live status row */}
-          {isToday && (
+          {showRealtimeStatus && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <DayArc />
 
@@ -162,7 +169,7 @@ export default function StudentDashboard() {
           )}
 
           {/* Countdown */}
-          {isToday && upcomingClass && !ongoingClass && (
+          {showRealtimeStatus && upcomingClass && !ongoingClass && (
             <CountdownTimer nextClass={upcomingClass} />
           )}
 
@@ -195,7 +202,13 @@ export default function StudentDashboard() {
             ) : (
               <div className="space-y-3">
                 {entries.map(entry => (
-                  <ClassCard key={entry._id} entry={entry} showProgress />
+                  <ClassCard
+                    key={entry._id}
+                    entry={entry}
+                    showRealtimeStatus={showRealtimeStatus}
+                    forceCompleted={isPastDate}
+                    showProgress={showRealtimeStatus}
+                  />
                 ))}
               </div>
             )}

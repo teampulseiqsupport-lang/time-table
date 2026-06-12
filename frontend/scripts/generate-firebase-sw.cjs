@@ -1,13 +1,44 @@
-importScripts('https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.0.0/firebase-messaging-compat.js');
+const fs = require('fs');
+const path = require('path');
+
+const rootDir = path.resolve(__dirname, '..');
+const envPath = path.join(rootDir, '.env');
+const outputPath = path.join(rootDir, 'public', 'firebase-messaging-sw.js');
+
+const parseEnvFile = (filePath) => {
+  if (!fs.existsSync(filePath)) return {};
+
+  return fs.readFileSync(filePath, 'utf8')
+    .split(/\r?\n/)
+    .reduce((env, line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) return env;
+
+      const separatorIndex = trimmed.indexOf('=');
+      if (separatorIndex === -1) return env;
+
+      const key = trimmed.slice(0, separatorIndex).trim();
+      const value = trimmed.slice(separatorIndex + 1).trim().replace(/^["']|["']$/g, '');
+      env[key] = value;
+      return env;
+    }, {});
+};
+
+const localEnv = parseEnvFile(envPath);
+const readEnv = (key) => process.env[key] || localEnv[key] || '';
 
 const firebaseConfig = {
-  "apiKey": "AIzaSyCayeaMJpRZgJrAm04BrEZcSo1ZKUJhNnY",
-  "authDomain": "timetable-system-443cd.firebaseapp.com",
-  "projectId": "timetable-system-443cd",
-  "messagingSenderId": "992922624403",
-  "appId": "1:992922624403:web:034356609b40b510ba0866"
+  apiKey: readEnv('VITE_FIREBASE_API_KEY'),
+  authDomain: readEnv('VITE_FIREBASE_AUTH_DOMAIN'),
+  projectId: readEnv('VITE_FIREBASE_PROJECT_ID'),
+  messagingSenderId: readEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: readEnv('VITE_FIREBASE_APP_ID'),
 };
+
+const serviceWorker = `importScripts('https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.0.0/firebase-messaging-compat.js');
+
+const firebaseConfig = ${JSON.stringify(firebaseConfig, null, 2)};
 const hasFirebaseConfig = Boolean(
   firebaseConfig.apiKey &&
   firebaseConfig.projectId &&
@@ -66,3 +97,7 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+`;
+
+fs.writeFileSync(outputPath, serviceWorker);
+console.log('Generated public/firebase-messaging-sw.js from VITE_FIREBASE_* env values.');

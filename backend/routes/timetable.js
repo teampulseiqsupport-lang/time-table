@@ -57,6 +57,16 @@ const normalizeTime = (timeVal) => {
   return timeVal.toString().trim();
 };
 
+const normalizeTimetablePayload = (payload) => {
+  const reminderBeforeMinutes = Number(payload.reminderBeforeMinutes ?? payload.reminderBefore ?? payload.reminderMinutes ?? 10);
+
+  return {
+    ...payload,
+    reminderBeforeMinutes: Number.isFinite(reminderBeforeMinutes) ? reminderBeforeMinutes : 10,
+    batch: payload.batch || payload.section || ''
+  };
+};
+
 // @GET /api/timetable - Get timetable for logged-in student
 router.get('/', protect, async (req, res) => {
   try {
@@ -68,12 +78,22 @@ router.get('/', protect, async (req, res) => {
     }
 
     const targetDate = date ? moment.tz(date, 'Asia/Kolkata') : moment.tz('Asia/Kolkata');
+    const selectedDate = targetDate.format('YYYY-MM-DD');
+    const today = moment.tz('Asia/Kolkata').format('YYYY-MM-DD');
+    const showRealtimeStatus = selectedDate === today;
     const dayName = targetDate.format('dddd');
 
     // Check holiday
-    const holiday = await Holiday.findOne({ date: targetDate.format('YYYY-MM-DD'), isActive: true });
+    const holiday = await Holiday.findOne({ date: selectedDate, isActive: true });
     if (holiday) {
-      return res.json({ success: true, holiday: holiday.reason, timetable: [], date: targetDate.format('YYYY-MM-DD'), day: dayName });
+      return res.json({
+        success: true,
+        holiday: holiday.reason,
+        timetable: [],
+        date: selectedDate,
+        day: dayName,
+        showRealtimeStatus
+      });
     }
 
     // Get timetable (optimized with field selection and lean)
@@ -84,15 +104,16 @@ router.get('/', protect, async (req, res) => {
       isActive: true,
       type: { $ne: 'Free' }
     })
-    .select('subjectName subjectCode facultyName room block startTime endTime type isCancelled cancellationReason roomChanged oldRoom')
+    .select('subjectName subjectCode facultyName room block startTime endTime reminderBeforeMinutes type isCancelled cancellationReason roomChanged oldRoom')
     .sort({ startTime: 1 })
     .lean();
 
     res.json({
       success: true,
       timetable,
-      date: targetDate.format('YYYY-MM-DD'),
+      date: selectedDate,
       day: dayName,
+      showRealtimeStatus,
       section: user.section,
       session: user.session
     });
@@ -115,7 +136,7 @@ router.get('/week', protect, async (req, res) => {
       isActive: true,
       type: { $ne: 'Free' }
     })
-    .select('day subjectName subjectCode facultyName room block startTime endTime type isCancelled')
+    .select('day subjectName subjectCode facultyName room block startTime endTime reminderBeforeMinutes type isCancelled')
     .sort({ day: 1, startTime: 1 })
     .lean();
 
@@ -142,7 +163,7 @@ router.get('/all', protect, adminOnly, async (req, res) => {
     if (day) query.day = day;
 
     const timetable = await Timetable.find(query)
-    .select('section session day year subjectName subjectCode facultyName room block startTime endTime type isActive')
+    .select('section session day year subjectName subjectCode facultyName room block startTime endTime reminderBeforeMinutes type isActive isCancelled')
     .sort({ section: 1, day: 1, startTime: 1 })
     .lean();
     res.json({ success: true, timetable });
@@ -178,6 +199,7 @@ router.post('/upload', protect, adminOnly, upload.single('file'), async (req, re
           const block = row['Block'] || row['block'] || row['BLOCK'] || '';
           const startTime = normalizeTime(row['StartTime'] || row['start_time'] || row['Start Time'] || row['START_TIME'] || '');
           const endTime = normalizeTime(row['EndTime'] || row['end_time'] || row['End Time'] || row['END_TIME'] || '');
+          const reminderBeforeMinutes = Number(row['ReminderBeforeMinutes'] || row['reminderBeforeMinutes'] || row['Reminder Minutes'] || row['REMINDER_MINUTES'] || 10);
           const type = row['Type'] || row['type'] || row['TYPE'] || 'Theory';
           const session = row['Session'] || row['session'] || row['SESSION'] || req.body.session || '2025-26';
           const year = row['Year'] || row['year'] || row['YEAR'] || req.body.year || '3rd Year';
@@ -211,6 +233,7 @@ router.post('/upload', protect, adminOnly, upload.single('file'), async (req, re
               block, 
               startTime, 
               endTime, 
+              reminderBeforeMinutes: Number.isFinite(reminderBeforeMinutes) ? reminderBeforeMinutes : 10,
               type, 
               session: session.toString(), 
               year: year.toString(), 
@@ -305,12 +328,12 @@ router.post('/', protect, adminOnly, async (req, res) => {
 
     const existing = await Timetable.findOne({ section: section?.toUpperCase(), day, startTime, session: finalSession });
     if (existing) {
-      const updated = await Timetable.findByIdAndUpdate(existing._id, { ...req.body, year: finalYear, session: finalSession }, { new: true });
+      const updated = await Timetable.findByIdAndUpdate(existing._id, normalizeTimetablePayload({ ...req.body, year: finalYear, session: finalSession }), { new: true });
       return res.json({ success: true, timetable: updated, message: 'Updated existing entry' });
     }
 
     const timetable = await Timetable.create({ 
-      ...req.body, 
+      ...normalizeTimetablePayload(req.body), 
       section: section?.toUpperCase(),
       year: finalYear,
       session: finalSession
@@ -329,7 +352,7 @@ router.put('/:id', protect, adminOnly, async (req, res) => {
 
     // Ensure year is set for updates
     const updateData = {
-      ...req.body,
+      ...normalizeTimetablePayload(req.body),
       year: req.body.year || original.year || '3rd Year',
       session: req.body.session || original.session || '2025-26'
     };

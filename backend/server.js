@@ -13,6 +13,7 @@ const notificationRoutes = require('./routes/notification');
 
 const { sendClassReminders } = require('./utils/notificationScheduler');
 const { initializeFirebase } = require('./config/firebase');
+const NotificationLog = require('./models/NotificationLog');
 
 const app = express();
 
@@ -50,7 +51,11 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/timetable
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log('✅ MongoDB Connected'))
+.then(async () => {
+  console.log('✅ MongoDB Connected');
+  await NotificationLog.init();
+  console.log('Notification log indexes ready');
+})
 .catch(err => console.error('❌ MongoDB Error:', err));
 
 // Routes

@@ -51,6 +51,22 @@ const timetableSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  reminderBeforeMinutes: {
+    type: Number,
+    min: 0,
+    max: 1440,
+    default: 10
+  },
+  date: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  batch: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   endTime: {
     type: String,
     required: true

@@ -18,7 +18,7 @@ const TIME_SLOTS = [
   { label: '03:00 PM - 04:00 PM', start: '03:00 PM', end: '04:00 PM' },
 ]
 
-const EMPTY = { session: '2025-26', year: '3rd Year', section: '', day: 'Monday', subjectName: '', subjectCode: '', facultyName: '', room: '', block: '', startTime: '08:00 AM', endTime: '09:00 AM', type: 'Theory' }
+const EMPTY = { session: '2025-26', year: '3rd Year', section: '', day: 'Monday', subjectName: '', subjectCode: '', facultyName: '', room: '', block: '', startTime: '08:00 AM', endTime: '09:00 AM', reminderBeforeMinutes: 10, type: 'Theory' }
 
 export default function AdminTimetable() {
   const dispatch = useDispatch()
@@ -68,7 +68,7 @@ export default function AdminTimetable() {
     setModal('add')
   }
 
-  const openEdit = (entry) => { setForm(entry); setSelectedSlots([]); setSelectedSections([]); setModal('edit') }
+  const openEdit = (entry) => { setForm({ ...entry, reminderBeforeMinutes: entry.reminderBeforeMinutes ?? 10 }); setSelectedSlots([]); setSelectedSections([]); setModal('edit') }
   const closeModal = () => { setModal(null); setForm(EMPTY); setSelectedSlots([]); setSelectedSections([]) }
 
   const handleSectionToggle = (sectionName) => {
@@ -267,13 +267,14 @@ export default function AdminTimetable() {
                 <th>Faculty</th>
                 <th>Room</th>
                 <th>Time</th>
+                <th>Reminder</th>
                 <th>Type</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan="9" className="text-center text-slate-500 py-10">No entries found</td></tr>
+                <tr><td colSpan="10" className="text-center text-slate-500 py-10">No entries found</td></tr>
               ) : filtered.map(entry => (
                 <tr key={entry._id} className={entry.isCancelled ? 'opacity-50' : ''}>
                   <td><span className="badge badge-theory">{entry.section}</span></td>
@@ -288,6 +289,7 @@ export default function AdminTimetable() {
                     {entry.block ? `${entry.block}-${entry.room}` : entry.room || '—'}
                   </td>
                   <td className="font-mono text-xs text-slate-400 whitespace-nowrap">{entry.startTime}–{entry.endTime}</td>
+                  <td className="font-mono text-xs text-slate-400 whitespace-nowrap">{entry.reminderBeforeMinutes ?? 10} min</td>
                   <td>
                     <span className={`badge ${entry.type === 'Lab' ? 'badge-lab' : entry.type === 'Lunch' ? 'badge-lunch' : 'badge-theory'}`}>
                       {entry.type}
@@ -483,6 +485,18 @@ export default function AdminTimetable() {
                   <input value={form.facultyName} onChange={e => setForm({ ...form, facultyName: e.target.value })}
                     className="input-field" placeholder="Prof. Name" />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Reminder Before Class (minutes)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="1440"
+                  value={form.reminderBeforeMinutes ?? 10}
+                  onChange={e => setForm({ ...form, reminderBeforeMinutes: Number(e.target.value) })}
+                  className="input-field"
+                />
               </div>
 
               {/* Room & Block */}
