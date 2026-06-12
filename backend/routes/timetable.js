@@ -18,6 +18,32 @@ const {
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+const normalizeHeader = (value) => value?.toString().toLowerCase().replace(/[^a-z0-9]/g, '') || '';
+
+const getCell = (row, aliases, fallback = '') => {
+  const normalizedAliases = aliases.map(normalizeHeader);
+  const key = Object.keys(row).find(column => normalizedAliases.includes(normalizeHeader(column)));
+  return key ? row[key] : fallback;
+};
+
+const toWorkbookPreview = (buffer) => {
+  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false });
+  return workbook.SheetNames.map(sheetName => {
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
+      defval: '',
+      header: 1,
+      blankrows: false
+    });
+
+    return {
+      sheetName,
+      headers: rows[0] || [],
+      rows: rows.slice(1, 101),
+      totalRows: Math.max(rows.length - 1, 0)
+    };
+  });
+};
+
 // Parse section ranges like "3A,3B,3C" or "3A-3F"
 const parseSections = (sectionStr) => {
   if (!sectionStr) return [];
@@ -186,23 +212,23 @@ router.post('/upload', protect, adminOnly, upload.single('file'), async (req, re
 
       for (const row of rows) {
         try {
-          const sectionStr = row['Section'] || row['section'] || row['CLASS'] || '';
+          const sectionStr = getCell(row, ['Section', 'Class', 'Batch', 'Group']);
           const sectionsArr = parseSections(sectionStr);
 
           if (!sectionsArr.length) continue;
 
-          const day = row['Day'] || row['day'] || row['DAY'] || '';
-          const subjectName = row['Subject'] || row['SubjectName'] || row['subject_name'] || row['SUBJECT'] || '';
-          const subjectCode = row['Code'] || row['SubjectCode'] || row['subject_code'] || row['CODE'] || '';
-          const facultyName = row['Faculty'] || row['FacultyName'] || row['faculty'] || row['FACULTY'] || '';
-          const room = row['Room'] || row['room'] || row['ROOM'] || '';
-          const block = row['Block'] || row['block'] || row['BLOCK'] || '';
-          const startTime = normalizeTime(row['StartTime'] || row['start_time'] || row['Start Time'] || row['START_TIME'] || '');
-          const endTime = normalizeTime(row['EndTime'] || row['end_time'] || row['End Time'] || row['END_TIME'] || '');
-          const reminderBeforeMinutes = Number(row['ReminderBeforeMinutes'] || row['reminderBeforeMinutes'] || row['Reminder Minutes'] || row['REMINDER_MINUTES'] || 10);
-          const type = row['Type'] || row['type'] || row['TYPE'] || 'Theory';
-          const session = row['Session'] || row['session'] || row['SESSION'] || req.body.session || '2025-26';
-          const year = row['Year'] || row['year'] || row['YEAR'] || req.body.year || '3rd Year';
+          const day = getCell(row, ['Day', 'Weekday']);
+          const subjectName = getCell(row, ['Subject', 'SubjectName', 'Subject Name', 'Course', 'CourseName']);
+          const subjectCode = getCell(row, ['Code', 'SubjectCode', 'Subject Code', 'CourseCode']);
+          const facultyName = getCell(row, ['Faculty', 'FacultyName', 'Faculty Name', 'Teacher', 'Professor']);
+          const room = getCell(row, ['Room', 'RoomNo', 'Room No', 'Classroom']);
+          const block = getCell(row, ['Block', 'Building']);
+          const startTime = normalizeTime(getCell(row, ['StartTime', 'Start Time', 'From', 'Begin']));
+          const endTime = normalizeTime(getCell(row, ['EndTime', 'End Time', 'To', 'Finish']));
+          const reminderBeforeMinutes = Number(getCell(row, ['ReminderBeforeMinutes', 'Reminder Minutes', 'ReminderBefore', 'Reminder'], 10));
+          const type = getCell(row, ['Type', 'ClassType', 'Class Type'], 'Theory');
+          const session = getCell(row, ['Session', 'AcademicSession'], req.body.session || '2025-26');
+          const year = getCell(row, ['Year', 'AcademicYear'], req.body.year || '3rd Year');
 
           if (!day || !subjectName || !startTime || !endTime) continue;
 
@@ -271,18 +297,22 @@ router.post('/upload', protect, adminOnly, upload.single('file'), async (req, re
       fs.writeFileSync(filePath, req.file.buffer);
 
       // Archive previous references
-      await ReferenceFile.updateMany({ session: '2025-26', status: 'active' }, { status: 'archived' });
+      const referenceSession = req.body.session || '2025-26';
+      const referenceYear = req.body.year || '3rd Year';
+      await ReferenceFile.updateMany({ session: referenceSession, status: 'active' }, { status: 'archived' });
 
       // Save reference metadata to database
       const refFile = await ReferenceFile.create({
         fileName: req.file.originalname,
+        storedFileName: fileName,
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
+        fileData: req.file.buffer,
         uploadedBy: req.user.name || 'Admin',
-        session: '2025-26',
-        year: '3rd Year',
+        session: referenceSession,
+        year: referenceYear,
         status: 'active',
-        description: `Official timetable reference uploaded for 2025-26 (3rd Year)`
+        description: `Official timetable reference uploaded for ${referenceSession} (${referenceYear})`
       });
 
       console.log('✅ Reference file saved:', fileName);
@@ -429,10 +459,56 @@ router.get('/reference/info', async (req, res) => {
         uploadDate: refFile.uploadDate,
         session: refFile.session,
         year: refFile.year,
-        description: refFile.description
+        description: refFile.description,
+        previewUrl: `/api/timetable/reference/${refFile._id}/preview`,
+        downloadUrl: `/api/timetable/reference/${refFile._id}/download`
       }
     });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @GET /api/timetable/reference/:id/preview - Preview uploaded Excel as JSON
+router.get('/reference/:id/preview', protect, async (req, res) => {
+  try {
+    const refFile = await ReferenceFile.findOne({
+      _id: req.params.id,
+      isActive: true
+    }).select('+fileData');
+
+    if (!refFile || !refFile.fileData) {
+      return res.status(404).json({ success: false, message: 'Reference file not found' });
+    }
+
+    res.json({
+      success: true,
+      fileName: refFile.fileName,
+      sheets: toWorkbookPreview(refFile.fileData)
+    });
+  } catch (error) {
+    console.error('Reference preview error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @GET /api/timetable/reference/:id/download - Download uploaded Excel
+router.get('/reference/:id/download', protect, async (req, res) => {
+  try {
+    const refFile = await ReferenceFile.findOne({
+      _id: req.params.id,
+      isActive: true
+    }).select('+fileData');
+
+    if (!refFile || !refFile.fileData) {
+      return res.status(404).json({ success: false, message: 'Reference file not found' });
+    }
+
+    res.setHeader('Content-Type', refFile.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(refFile.fileName || 'timetable-reference.xlsx')}"`);
+    res.send(refFile.fileData);
+  } catch (error) {
+    console.error('Reference download error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

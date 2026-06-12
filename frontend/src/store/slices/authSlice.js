@@ -12,6 +12,16 @@ export const loginUser = createAsyncThunk('auth/login', async (credentials, { re
   }
 })
 
+export const googleLoginUser = createAsyncThunk('auth/google', async (payload, { rejectWithValue }) => {
+  try {
+    const { data } = await api.post('/auth/google', payload)
+    localStorage.setItem('token', data.token)
+    return data
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Google login failed')
+  }
+})
+
 export const registerUser = createAsyncThunk('auth/register', async (userData, { rejectWithValue }) => {
   try {
     const { data } = await api.post('/auth/register', userData)
@@ -28,6 +38,25 @@ export const fetchMe = createAsyncThunk('auth/me', async (_, { rejectWithValue }
     return data
   } catch (err) {
     return rejectWithValue(err.response?.data?.message || 'Failed to fetch user')
+  }
+})
+
+export const forgotPassword = createAsyncThunk('auth/forgotPassword', async (payload, { rejectWithValue }) => {
+  try {
+    const { data } = await api.post('/auth/forgot-password', payload)
+    return data
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Failed to send reset link')
+  }
+})
+
+export const resetPassword = createAsyncThunk('auth/resetPassword', async (payload, { rejectWithValue }) => {
+  try {
+    const { data } = await api.post('/auth/reset-password', payload)
+    localStorage.setItem('token', data.token)
+    return data
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Password reset failed')
   }
 })
 
@@ -65,6 +94,19 @@ const authSlice = createSlice({
         state.error = action.payload
         toast.error(action.payload)
       })
+      .addCase(googleLoginUser.pending, (state) => { state.loading = true; state.error = null })
+      .addCase(googleLoginUser.fulfilled, (state, action) => {
+        state.loading = false
+        state.user = action.payload.user
+        state.token = action.payload.token
+        state.initialized = true
+        toast.success(`Welcome, ${action.payload.user.name.split(' ')[0]}!`)
+      })
+      .addCase(googleLoginUser.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload
+        toast.error(action.payload)
+      })
       .addCase(registerUser.pending, (state) => { state.loading = true; state.error = null })
       .addCase(registerUser.fulfilled, (state, action) => {
         state.loading = false
@@ -74,6 +116,29 @@ const authSlice = createSlice({
         toast.success('Registration successful! Welcome aboard!')
       })
       .addCase(registerUser.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload
+        toast.error(action.payload)
+      })
+      .addCase(forgotPassword.pending, (state) => { state.loading = true; state.error = null })
+      .addCase(forgotPassword.fulfilled, (state, action) => {
+        state.loading = false
+        toast.success(action.payload.message || 'Reset link sent')
+      })
+      .addCase(forgotPassword.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload
+        toast.error(action.payload)
+      })
+      .addCase(resetPassword.pending, (state) => { state.loading = true; state.error = null })
+      .addCase(resetPassword.fulfilled, (state, action) => {
+        state.loading = false
+        state.user = action.payload.user
+        state.token = action.payload.token
+        state.initialized = true
+        toast.success('Password reset successful')
+      })
+      .addCase(resetPassword.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload
         toast.error(action.payload)

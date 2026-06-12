@@ -3,8 +3,13 @@ const mongoose = require('mongoose');
 const ReferenceFileSchema = new mongoose.Schema(
   {
     fileName: String,
+    storedFileName: String,
     fileSize: Number,
     mimeType: String,
+    fileData: {
+      type: Buffer,
+      select: false
+    },
     uploadedBy: String,  // Admin name
     uploadDate: {
       type: Date,

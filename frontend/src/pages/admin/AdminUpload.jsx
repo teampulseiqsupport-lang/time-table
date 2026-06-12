@@ -32,13 +32,23 @@ export default function AdminUpload() {
     }
   }
 
-  const handleDownloadReference = () => {
+  const handleDownloadReference = async () => {
     if (!refFile) return
-    toast.success(`📥 Download initiated for: ${refFile.fileName}`)
-    // Note: In production, implement actual download via API endpoint
-    // const link = document.createElement('a')
-    // link.href = `/public/reference-files/${refFile.fileName}`
-    // link.click()
+    try {
+      const response = await api.get(refFile.downloadUrl || `/timetable/reference/${refFile._id}/download`, { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', refFile.fileName || 'timetable-reference.xlsx')
+      document.body.appendChild(link)
+      link.click()
+      link.parentNode.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      toast.success(`Downloaded: ${refFile.fileName}`)
+    } catch (error) {
+      console.error('Reference download error:', error)
+      toast.error('Failed to download reference file')
+    }
   }
 
   const handleFile = (f) => {

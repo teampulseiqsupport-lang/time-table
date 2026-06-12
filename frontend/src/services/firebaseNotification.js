@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app'
+import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getMessaging, getToken, onMessage } from 'firebase/messaging'
 import api from './api'
 
@@ -14,6 +14,7 @@ const firebaseConfig = {
 let firebaseApp = null
 let messaging = null
 let serviceWorkerRegistration = null
+let tokenSyncInProgress = false
 
 const hasFirebaseConfig = () => (
   firebaseConfig.apiKey &&
@@ -21,6 +22,17 @@ const hasFirebaseConfig = () => (
   firebaseConfig.messagingSenderId &&
   firebaseConfig.appId
 )
+
+const getVapidKey = () => import.meta.env.VITE_FIREBASE_VAPID_KEY?.trim()
+
+const hasValidVapidKey = () => {
+  const vapidKey = getVapidKey()
+
+  if (!vapidKey) return false
+  if (vapidKey.startsWith('G-')) return false
+
+  return vapidKey.length > 40
+}
 
 const appRouteFromNotificationRoute = (route) => (
   route === '/student/dashboard' ? '/dashboard' : route || '/dashboard'
@@ -45,7 +57,7 @@ const initializeFirebaseMessaging = async () => {
       return null
     }
 
-    firebaseApp = initializeApp(firebaseConfig)
+    firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig)
     serviceWorkerRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
       scope: '/'
     })
@@ -83,6 +95,11 @@ const requestNotificationPermission = async () => {
   try {
     if (!('Notification' in window)) return false
 
+    if (!hasValidVapidKey()) {
+      console.error('Firebase VAPID key is missing or invalid. Set VITE_FIREBASE_VAPID_KEY to the Web Push certificate key from Firebase Console > Cloud Messaging.')
+      return false
+    }
+
     if (Notification.permission === 'denied') return false
 
     if (Notification.permission !== 'granted') {
@@ -100,11 +117,19 @@ const requestNotificationPermission = async () => {
 
 const getFCMToken = async () => {
   try {
+    if (tokenSyncInProgress) return null
+    tokenSyncInProgress = true
+
+    if (!hasValidVapidKey()) {
+      console.error('Cannot create FCM token: VITE_FIREBASE_VAPID_KEY is missing or invalid.')
+      return null
+    }
+
     if (!messaging) await initializeFirebaseMessaging()
     if (!messaging) return null
 
     const token = await getToken(messaging, {
-      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+      vapidKey: getVapidKey(),
       serviceWorkerRegistration,
     })
 
@@ -115,6 +140,8 @@ const getFCMToken = async () => {
   } catch (error) {
     console.error('Error getting or saving FCM token:', error)
     return null
+  } finally {
+    tokenSyncInProgress = false
   }
 }
 

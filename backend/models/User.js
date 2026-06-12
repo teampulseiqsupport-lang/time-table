@@ -14,10 +14,24 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true
   },
+  universityRollNumber: {
+    type: String,
+    unique: true,
+    sparse: true,
+    uppercase: true,
+    trim: true
+  },
   password: {
     type: String,
-    required: [true, 'Password is required'],
+    required: function() {
+      return this.authProvider !== 'google';
+    },
     minlength: 6
+  },
+  authProvider: {
+    type: String,
+    enum: ['local', 'google'],
+    default: 'local'
   },
   role: {
     type: String,
@@ -40,6 +54,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  passwordResetToken: {
+    type: String,
+    select: false
+  },
+  passwordResetExpires: {
+    type: Date,
+    select: false
+  },
   avatar: {
     type: String,
     default: null
@@ -54,7 +76,7 @@ const userSchema = new mongoose.Schema({
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
+  if (!this.password || !this.isModified('password')) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });

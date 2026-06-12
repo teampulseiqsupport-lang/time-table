@@ -6,6 +6,8 @@ import { initializeFirebaseMessaging, requestNotificationPermission } from './se
 
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import DashboardLayout from './components/shared/DashboardLayout'
 import StudentDashboard from './pages/StudentDashboard'
 import WeeklyView from './pages/WeeklyView'
@@ -150,6 +152,8 @@ export default function App() {
 
         <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+        <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+        <Route path="/reset-password" element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
 
         {/* Student */}
         <Route path="/" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
