@@ -59,7 +59,7 @@ export default function ProfilePage() {
 
   return (
     <div
-      className="min-h-screen relative overflow-x-hidden"
+      className="min-h-screen relative overflow-hidden"
       style={{ background: 'linear-gradient(160deg, #0a0e1a 0%, #0d1224 60%, #0a0f1e 100%)' }}>
 
       {/* Ambient orbs */}
@@ -73,7 +73,7 @@ export default function ProfilePage() {
           backgroundSize: '32px 32px'
         }} />
 
-      <div className="relative z-10 p-4 lg:p-6 max-w-2xl mx-auto pb-12 space-y-4">
+      <div className="relative z-10 p-4 lg:p-6 max-w-2xl mx-auto pb-12 overflow-y-auto h-screen space-y-4">
 
         {/* ── PAGE HEADER ── */}
         <div className="flex items-center gap-4 pt-2 mb-6">

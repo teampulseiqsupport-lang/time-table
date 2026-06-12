@@ -79,7 +79,7 @@ export default function StudentDashboard() {
 
   return (
     <div
-      className="min-h-screen relative"
+      className="min-h-screen relative overflow-hidden"
       style={{ background: 'linear-gradient(160deg, #0a0e1a 0%, #0d1224 60%, #0a0f1e 100%)' }}>
 
       {/* ambient orbs — subtle, behind all content */}
@@ -93,7 +93,7 @@ export default function StudentDashboard() {
           backgroundSize: '32px 32px'
         }} />
 
-      <div className="relative z-10 p-4 lg:p-6 max-w-6xl mx-auto space-y-6 pb-12">
+      <div className="relative z-10 p-4 lg:p-6 max-w-6xl mx-auto space-y-6 pb-12 overflow-y-auto h-screen">
 
         {/* ── HEADER ───────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pt-2">

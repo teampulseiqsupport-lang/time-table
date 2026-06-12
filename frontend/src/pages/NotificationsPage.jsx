@@ -36,7 +36,7 @@ export default function NotificationsPage() {
 
   return (
     <div
-      className="min-h-screen relative overflow-x-hidden"
+      className="min-h-screen relative overflow-hidden"
       style={{ background: 'linear-gradient(160deg, #0a0e1a 0%, #0d1224 60%, #0a0f1e 100%)' }}>
 
       {/* Ambient orbs */}
@@ -50,7 +50,7 @@ export default function NotificationsPage() {
           backgroundSize: '32px 32px'
         }} />
 
-      <div className="relative z-10 p-4 lg:p-6 max-w-3xl mx-auto pb-12">
+      <div className="relative z-10 p-4 lg:p-6 max-w-3xl mx-auto pb-12 overflow-y-auto h-screen">
 
         {/* ── HEADER ── */}
         <div className="flex items-center justify-between gap-4 mb-8 pt-2">
