@@ -49,7 +49,7 @@ export function CalendarView() {
 
   return (
     <div
-      className="min-h-screen relative"
+      className="min-h-screen relative overflow-x-hidden"
       style={{ background: 'linear-gradient(160deg, #0a0e1a 0%, #0d1224 60%, #0a0f1e 100%)' }}>
 
       {/* Ambient orbs */}
@@ -209,8 +209,8 @@ export function CalendarView() {
                 <p className="text-slate-500 text-sm mt-1">Nothing scheduled on this day</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1"
-                style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(99,102,241,0.3) transparent' }}>
+              <div className="space-y-3 max-h-[500px] overflow-y-auto"
+                style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(99,102,241,0.3) transparent', overflowX: 'hidden' }}>
                 {entries.map(e => <ClassCard key={e._id} entry={e} />)}
               </div>
             )}

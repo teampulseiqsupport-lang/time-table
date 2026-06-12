@@ -24,7 +24,7 @@ export default function WeeklyView() {
 
   return (
     <div
-      className="min-h-screen relative"
+      className="min-h-screen relative overflow-x-hidden"
       style={{ background: 'linear-gradient(160deg, #0a0e1a 0%, #0d1224 60%, #0a0f1e 100%)' }}>
 
       {/* Ambient orbs */}
