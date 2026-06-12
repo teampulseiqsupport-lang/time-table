@@ -72,7 +72,7 @@ export default function LoginPage() {
                   value={form.identifier}
                   onChange={e => setForm({ ...form, identifier: e.target.value })}
                   className="input-field"
-                  placeholder="piyush@email.com or 23BCS..."
+                  placeholder="Enter email or roll number"
                   required
                 />
               </div>
