@@ -3,9 +3,9 @@ import { Clock, MapPin, User, BookOpen, Beaker, Coffee, XCircle } from 'lucide-r
 import { getClassProgress, getCurrentISTMinutes, timeToMinutes } from '../../utils/time'
 
 const completedBadgeStyle = {
-  background: 'rgba(100,116,139,0.15)',
-  color: '#CBD5E1',
-  border: '1px solid rgba(148,163,184,0.2)'
+  background: 'rgba(59,130,246,0.16)',
+  color: '#93C5FD',
+  border: '1px solid rgba(96,165,250,0.35)'
 }
 
 const breakBadgeStyle = {
@@ -29,6 +29,13 @@ export default function ClassCard({
   const completed = forceCompleted || (showRealtimeStatus && currentMinutes >= endMinutes)
   const futureDetailsOnly = !showRealtimeStatus && !forceCompleted
   const progress = ongoing && showProgress ? getClassProgress(entry) : 0
+  const cardStatusClass = ongoing
+    ? 'ongoing-card status-card-ongoing p-5'
+    : upcoming
+      ? 'glass-card status-card-upcoming p-4'
+      : completed
+        ? 'glass-card status-card-completed p-4'
+        : 'glass-card p-4 hover:border-indigo-500/30'
 
   if (entry.type === 'Lunch') {
     return (
@@ -69,7 +76,7 @@ export default function ClassCard({
   }
 
   return (
-    <div className={`relative overflow-hidden transition-all duration-300 ${ongoing ? 'ongoing-card p-5' : 'glass-card p-4 hover:border-indigo-500/30'}`}>
+    <div className={`relative overflow-hidden transition-all duration-300 ${cardStatusClass}`}>
       {ongoing && (
         <div className="absolute bottom-0 left-0 h-0.5 bg-emerald-500/30 w-full">
           <div
@@ -100,16 +107,16 @@ export default function ClassCard({
 
             <div className="flex flex-col items-end gap-1 flex-shrink-0">
               {ongoing && (
-                <span className="badge badge-ongoing flex items-center gap-1">
+                <span className="badge badge-ongoing status-chip-pulse flex items-center gap-1">
                   <span className="pulse-dot w-1.5 h-1.5" />
                   LIVE
                 </span>
               )}
               {upcoming && (
-                <span className="badge badge-upcoming">Upcoming</span>
+                <span className="badge badge-upcoming status-chip-blue status-chip-blink">Upcoming</span>
               )}
               {completed && (
-                <span className="badge" style={completedBadgeStyle}>Completed</span>
+                <span className="badge status-chip-blue status-chip-soft" style={completedBadgeStyle}>Completed</span>
               )}
               {showRealtimeStatus && (
                 <span className={`badge ${entry.type === 'Lab' ? 'badge-lab' : 'badge-theory'}`}>

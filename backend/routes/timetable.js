@@ -83,6 +83,26 @@ const normalizeTime = (timeVal) => {
   return timeVal.toString().trim();
 };
 
+const timeToMinutes = (timeStr) => {
+  if (!timeStr) return 0;
+  const clean = timeStr.toString().trim().toUpperCase();
+  const match = clean.match(/(\d+):(\d+)\s*(AM|PM)/);
+  if (!match) return 0;
+
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const ampm = match[3];
+
+  if (ampm === 'PM' && hours !== 12) hours += 12;
+  if (ampm === 'AM' && hours === 12) hours = 0;
+
+  return hours * 60 + minutes;
+};
+
+const sortByStartTime = (entries) => (
+  entries.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
+);
+
 const normalizeTimetablePayload = (payload) => {
   const reminderBeforeMinutes = Number(payload.reminderBeforeMinutes ?? payload.reminderBefore ?? payload.reminderMinutes ?? 10);
 
@@ -131,8 +151,8 @@ router.get('/', protect, async (req, res) => {
       type: { $ne: 'Free' }
     })
     .select('subjectName subjectCode facultyName room block startTime endTime reminderBeforeMinutes type isCancelled cancellationReason roomChanged oldRoom')
-    .sort({ startTime: 1 })
     .lean();
+    sortByStartTime(timetable);
 
     res.json({
       success: true,
@@ -163,7 +183,7 @@ router.get('/week', protect, async (req, res) => {
       type: { $ne: 'Free' }
     })
     .select('day subjectName subjectCode facultyName room block startTime endTime reminderBeforeMinutes type isCancelled')
-    .sort({ day: 1, startTime: 1 })
+    .sort({ day: 1 })
     .lean();
 
     const grouped = {};
@@ -171,6 +191,7 @@ router.get('/week', protect, async (req, res) => {
     timetable.forEach(entry => {
       if (grouped[entry.day]) grouped[entry.day].push(entry);
     });
+    Object.values(grouped).forEach(sortByStartTime);
 
     res.json({ success: true, timetable: grouped });
   } catch (error) {
@@ -190,8 +211,13 @@ router.get('/all', protect, adminOnly, async (req, res) => {
 
     const timetable = await Timetable.find(query)
     .select('section session day year subjectName subjectCode facultyName room block startTime endTime reminderBeforeMinutes type isActive isCancelled')
-    .sort({ section: 1, day: 1, startTime: 1 })
+    .sort({ section: 1, day: 1 })
     .lean();
+    timetable.sort((a, b) => (
+      (a.section || '').localeCompare(b.section || '') ||
+      (a.day || '').localeCompare(b.day || '') ||
+      timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
+    ));
     res.json({ success: true, timetable });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

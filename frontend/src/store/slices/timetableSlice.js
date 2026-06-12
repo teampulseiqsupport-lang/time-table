@@ -1,9 +1,14 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import api from '../../services/api'
+import { timeToMinutes } from '../../utils/time'
 
 // Simple in-memory cache for timetable requests
 const timetableCache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+const sortEntriesByStartTime = (entries = []) => (
+  [...entries].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
+)
 
 export const fetchTimetable = createAsyncThunk('timetable/fetch', async (date, { rejectWithValue, getState }) => {
   try {
@@ -89,7 +94,7 @@ const timetableSlice = createSlice({
       .addCase(fetchTimetable.pending, (state) => { state.loading = true; state.error = null })
       .addCase(fetchTimetable.fulfilled, (state, action) => {
         state.loading = false
-        state.entries = action.payload.timetable || []
+        state.entries = sortEntriesByStartTime(action.payload.timetable || [])
         state.holiday = action.payload.holiday || null
         state.currentDate = action.payload.date
         state.currentDay = action.payload.day
@@ -102,11 +107,13 @@ const timetableSlice = createSlice({
       .addCase(fetchWeeklyTimetable.pending, (state) => { state.weeklyLoading = true })
       .addCase(fetchWeeklyTimetable.fulfilled, (state, action) => {
         state.weeklyLoading = false
-        state.weekly = action.payload.timetable || {}
+        state.weekly = Object.fromEntries(
+          Object.entries(action.payload.timetable || {}).map(([day, entries]) => [day, sortEntriesByStartTime(entries)])
+        )
       })
       .addCase(fetchWeeklyTimetable.rejected, (state) => { state.weeklyLoading = false })
       .addCase(fetchAllTimetable.fulfilled, (state, action) => {
-        state.allEntries = action.payload.timetable || []
+        state.allEntries = sortEntriesByStartTime(action.payload.timetable || [])
       })
   },
 })
