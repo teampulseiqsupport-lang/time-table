@@ -77,8 +77,8 @@ export default function RegisterPage() {
         <section className="glass-card p-7 sm:p-8">
           <div className="flex items-center justify-between mb-7">
             <div>
-              <p className="text-slate-400 text-sm">Student Registration</p>
-              <h1 className="text-2xl font-bold text-white mt-1">Join CampusFlow</h1>
+              <p className="text-slate-400 text-sm">HWI Student Registration</p>
+              <h1 className="text-2xl font-bold text-white mt-1">Join TimeTable Pro </h1>
             </div>
             <div className="w-12 h-12 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center">
               <GraduationCap size={24} className="text-cyan-300" />
@@ -91,7 +91,7 @@ export default function RegisterPage() {
               <div className="relative">
                 <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                  className="input-field" placeholder="Piyush Mani Tripathi" required />
+                  className="input-field" placeholder="John Doe" required />
               </div>
             </div>
 
@@ -100,7 +100,7 @@ export default function RegisterPage() {
               <div className="relative">
                 <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
-                  className="input-field" placeholder="student@college.edu" required />
+                  className="input-field" placeholder="student@gla.ac.in" required />
               </div>
             </div>
 
@@ -109,7 +109,7 @@ export default function RegisterPage() {
               <div className="relative">
                 <Hash size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input value={form.universityRollNumber} onChange={e => setForm({ ...form, universityRollNumber: e.target.value.toUpperCase() })}
-                  className="input-field uppercase" placeholder="23BCS..." required />
+                  className="input-field uppercase" placeholder="2315000***" required />
               </div>
             </div>
 
