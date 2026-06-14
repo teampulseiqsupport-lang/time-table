@@ -43,22 +43,30 @@ export default function LoginPage() {
   const [failedLoginType, setFailedLoginType] = useState(null)
 
   useEffect(() => {
-    if (error) {
+    if (error && failedLoginType === 'google') {
       const errorLower = error.toLowerCase()
       // Check if it's a "not found" or "please provide" error
-      if (errorLower.includes('provide your university roll number') || errorLower.includes('not found')) {
-        if (failedLoginType === 'google') {
-          // Show Google modal to collect details
-          openGoogleModal()
-        } else {
-          // Show register modal for email/password
-          setShowRegisterModal(true)
-        }
+      if (errorLower.includes('provide your university roll number') || errorLower.includes('account not found')) {
+        // Show Google modal to collect details
+        openGoogleModal()
+        dispatch(clearError())
+        // Don't clear failedLoginType - keep it set
       }
-      setFailedLoginType(null)
-      dispatch(clearError())
     }
-  }, [error, dispatch, failedLoginType])
+  }, [error, failedLoginType, dispatch])
+
+  useEffect(() => {
+    if (error && failedLoginType === 'email') {
+      const errorLower = error.toLowerCase()
+      // Check if it's a "not found" error
+      if (errorLower.includes('account not found')) {
+        // Show register modal for email/password
+        setShowRegisterModal(true)
+        dispatch(clearError())
+        setFailedLoginType(null)
+      }
+    }
+  }, [error, failedLoginType, dispatch])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -119,6 +127,7 @@ export default function LoginPage() {
         session: '2025-26',
         year: '3rd Year'
       }))
+      // Success - clear modal and state
       setShowGoogleModal(false)
       setGoogleIdToken(null)
       setForm(f => ({ ...f, universityRollNumber: '', section: '' }))
@@ -459,7 +468,12 @@ export default function LoginPage() {
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowGoogleModal(false)}
+            onClick={() => {
+              setShowGoogleModal(false)
+              setGoogleIdToken(null)
+              setForm(f => ({ ...f, universityRollNumber: '', section: '' }))
+              setFailedLoginType(null)
+            }}
           />
 
           {/* Modal */}
@@ -563,6 +577,7 @@ export default function LoginPage() {
                   setShowGoogleModal(false)
                   setGoogleIdToken(null)
                   setForm(f => ({ ...f, universityRollNumber: '', section: '' }))
+                  setFailedLoginType(null)
                 }}
                 className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:bg-white/10"
                 style={{

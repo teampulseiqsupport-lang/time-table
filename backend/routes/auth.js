@@ -211,7 +211,7 @@ router.post('/google', async (req, res) => {
       if (!rollNumber || !section) {
         return res.status(401).json({ 
           success: false, 
-          message: 'Please provide your university roll number and section to create account with Google.' 
+          message: 'Account not found. Please provide your university roll number and section to create account.' 
         });
       }
 
