@@ -1,8 +1,8 @@
-import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
-import { Eye, EyeOff, Lock, Mail, Shield, Sparkles, UserRound, ArrowRight, Zap, Bell, CalendarDays } from 'lucide-react'
-import { googleLoginUser, loginUser } from '../store/slices/authSlice'
+import { Eye, EyeOff, Lock, Mail, Shield, Sparkles, UserRound, ArrowRight, Zap, Bell, CalendarDays, AlertCircle } from 'lucide-react'
+import { googleLoginUser, loginUser, clearError } from '../store/slices/authSlice'
 import { signInWithGoogle } from '../services/firebaseAuth'
 import toast from 'react-hot-toast'
 
@@ -26,11 +26,20 @@ const FeatureCard = ({ icon: Icon, title, desc, accent }) => (
 
 export default function LoginPage() {
   const dispatch = useDispatch()
-  const { loading } = useSelector(s => s.auth)
+  const navigate = useNavigate()
+  const { loading, error } = useSelector(s => s.auth)
   const [form, setForm] = useState({ identifier: '', password: '' })
   const [showPass, setShowPass] = useState(false)
   const [isAdminMode, setIsAdminMode] = useState(false)
   const [focusedField, setFocusedField] = useState(null)
+  const [showRegisterModal, setShowRegisterModal] = useState(false)
+
+  useEffect(() => {
+    if (error && (error.toLowerCase().includes('not found') || error.toLowerCase().includes('does not exist') || error.toLowerCase().includes('user not'))) {
+      setShowRegisterModal(true)
+      dispatch(clearError())
+    }
+  }, [error, dispatch])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -295,6 +304,81 @@ export default function LoginPage() {
           </div>
         </section>
       </div>
+
+      {/* Registration Modal */}
+      {showRegisterModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowRegisterModal(false)}
+          />
+
+          {/* Modal */}
+          <div
+            className="relative rounded-3xl p-8 max-w-md w-full shadow-2xl"
+            style={{
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(15,17,35,0.98) 100%)',
+              border: '1px solid rgba(99,102,241,0.3)',
+              backdropFilter: 'blur(20px)'
+            }}>
+            {/* Icon */}
+            <div className="flex justify-center mb-5">
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  boxShadow: '0 0 40px rgba(99,102,241,0.3)'
+                }}>
+                <AlertCircle size={32} className="text-white" />
+              </div>
+            </div>
+
+            {/* Title */}
+            <h2 className="text-2xl font-bold text-white text-center mb-3">
+              Account Not Found
+            </h2>
+
+            {/* Description */}
+            <p className="text-slate-300 text-center text-sm leading-relaxed mb-7">
+              This email or roll number isn't registered yet. Create your account on the registration page and select your section to get started.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setShowRegisterModal(false)
+                  navigate('/register')
+                }}
+                className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
+                style={{
+                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  boxShadow: '0 0 30px rgba(99,102,241,0.3)'
+                }}>
+                <Sparkles size={16} />
+                Go to Register
+                <ArrowRight size={16} />
+              </button>
+
+              <button
+                onClick={() => setShowRegisterModal(false)}
+                className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:bg-white/10"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)'
+                }}>
+                Try Different Email
+              </button>
+            </div>
+
+            {/* Footer tip */}
+            <p className="text-xs text-slate-500 text-center mt-6">
+              Need help? Check that your email and roll number are correct.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

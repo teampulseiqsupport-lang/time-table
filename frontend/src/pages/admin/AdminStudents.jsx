@@ -75,14 +75,14 @@ export default function AdminStudents() {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  {['#', 'Name', 'Email', 'Section', 'Year', 'Session', 'Joined'].map(h => (
+                  {['#', 'Name', 'Email', 'Roll Number', 'Section', 'Year', 'Session', 'Joined'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan="7" className="text-center py-12">
+                  <tr><td colSpan="8" className="text-center py-12">
                     <div className="flex justify-center">
                       <svg className="animate-spin w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
@@ -91,7 +91,7 @@ export default function AdminStudents() {
                     </div>
                   </td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan="7" className="text-center text-slate-500 py-12">No students found</td></tr>
+                  <tr><td colSpan="8" className="text-center text-slate-500 py-12">No students found</td></tr>
                 ) : filtered.map((s, i) => (
                   <tr key={s._id}
                     className="transition-colors duration-150 hover:bg-white/[0.02]"
@@ -107,6 +107,11 @@ export default function AdminStudents() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-400 text-sm">{s.email}</td>
+                    <td className="px-4 py-3">
+                      {s.universityRollNumber
+                        ? <span className="font-mono text-xs text-slate-300 font-semibold tracking-wider">{s.universityRollNumber}</span>
+                        : <span className="text-slate-600">—</span>}
+                    </td>
                     <td className="px-4 py-3">
                       {s.section
                         ? <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-400/30">{s.section}</span>
