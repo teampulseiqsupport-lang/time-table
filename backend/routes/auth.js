@@ -150,10 +150,10 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// @POST /api/auth/google - Login/signup with Firebase Google auth
+// @POST /api/auth/google - Login with Firebase Google auth (NO AUTO SIGNUP)
 router.post('/google', async (req, res) => {
   try {
-    const { idToken, section, year, session, universityRollNumber } = req.body;
+    const { idToken } = req.body;
 
     if (!idToken) {
       return res.status(400).json({ success: false, message: 'Google ID token required' });
@@ -170,40 +170,17 @@ router.post('/google', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Google account email not available' });
     }
 
-    const rollNumber = normalizeRollNumber(universityRollNumber);
-    let user = await User.findOne({ email: decoded.email.toLowerCase() });
+    const user = await User.findOne({ email: decoded.email.toLowerCase() });
 
     if (!user) {
-      if (rollNumber) {
-        const rollExists = await User.findOne({ universityRollNumber: rollNumber });
-        if (rollExists) {
-          return res.status(400).json({ success: false, message: 'Roll number already registered with another account' });
-        }
-      }
+      // User doesn't exist - they must register first
+      return res.status(404).json({ success: false, message: 'User account not found. Please register first.' });
+    }
 
-      user = await User.create({
-        name: decoded.name || decoded.email.split('@')[0],
-        email: decoded.email,
-        universityRollNumber: rollNumber,
-        avatar: decoded.picture || null,
-        section,
-        year: year || '3rd Year',
-        session: session || '2025-26',
-        role: 'student',
-        authProvider: 'google'
-      });
-    } else {
-      const updates = {
-        authProvider: user.authProvider === 'local' ? 'local' : 'google',
-        avatar: user.avatar || decoded.picture || null
-      };
-
-      if (rollNumber && !user.universityRollNumber) updates.universityRollNumber = rollNumber;
-      if (section && !user.section) updates.section = section;
-      if (year && !user.year) updates.year = year;
-      if (session && !user.session) updates.session = session;
-
-      user = await User.findByIdAndUpdate(user._id, { $set: updates }, { new: true, runValidators: true });
+    // Update avatar if available
+    if (decoded.picture && !user.avatar) {
+      user.avatar = decoded.picture;
+      await user.save();
     }
 
     res.json({
