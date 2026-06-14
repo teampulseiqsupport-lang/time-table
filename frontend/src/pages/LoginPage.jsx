@@ -39,13 +39,26 @@ export default function LoginPage() {
   const [sectionSearch, setSectionSearch] = useState('')
   const [sectionOpen, setSectionOpen] = useState(false)
   const [loadingSections, setLoadingSections] = useState(false)
+  const [googleIdToken, setGoogleIdToken] = useState(null)
+  const [failedLoginType, setFailedLoginType] = useState(null)
 
   useEffect(() => {
-    if (error && (error.toLowerCase().includes('not found') || error.toLowerCase().includes('does not exist') || error.toLowerCase().includes('user not'))) {
-      setShowRegisterModal(true)
+    if (error) {
+      const errorLower = error.toLowerCase()
+      // If it's a "not found" error
+      if (errorLower.includes('not found') || errorLower.includes('does not exist') || errorLower.includes('user not')) {
+        // If failed login was Google, show modal to collect roll number/section
+        if (failedLoginType === 'google') {
+          openGoogleModal()
+        } else {
+          // For email/password login, redirect to register
+          setShowRegisterModal(true)
+        }
+      }
+      setFailedLoginType(null)
       dispatch(clearError())
     }
-  }, [error, dispatch])
+  }, [error, dispatch, failedLoginType])
 
   const fetchSections = async () => {
     if (sections.length > 0) return
@@ -67,33 +80,52 @@ export default function LoginPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    setFailedLoginType('email')
     dispatch(loginUser(form))
   }
 
   const handleGoogleLogin = async () => {
-    // Show modal to collect roll number and section first
-    await fetchSections()
-    setShowGoogleModal(true)
+    try {
+      const idToken = await signInWithGoogle()
+      setGoogleIdToken(idToken)
+      setFailedLoginType('google')
+      // Try to login first - if user exists, will be handled by dispatch
+      // If user doesn't exist, error will be caught in useEffect
+      await dispatch(googleLoginUser({ idToken, session: '2025-26', year: '3rd Year' }))
+    } catch (error) {
+      toast.error(error.message || 'Google sign-in failed')
+      setFailedLoginType(null)
+    }
   }
 
-  const handleGoogleLoginConfirm = async () => {
+  const handleGoogleLoginWithDetails = async () => {
     if (!form.universityRollNumber || !form.section) {
       toast.error('Please select section and enter roll number')
       return
     }
+    if (!googleIdToken) {
+      toast.error('Authentication token missing, please try again')
+      return
+    }
     try {
-      const idToken = await signInWithGoogle()
       await dispatch(googleLoginUser({
-        idToken,
+        idToken: googleIdToken,
         universityRollNumber: form.universityRollNumber,
         section: form.section,
         session: '2025-26',
         year: '3rd Year'
       }))
       setShowGoogleModal(false)
+      setGoogleIdToken(null)
+      setFailedLoginType(null)
     } catch (error) {
       toast.error(error.message || 'Google sign-in failed')
     }
+  }
+
+  const openGoogleModal = async () => {
+    await fetchSections()
+    setShowGoogleModal(true)
   }
 
   const inputClass = (field) =>
@@ -516,7 +548,7 @@ export default function LoginPage() {
             {/* Action Buttons */}
             <div className="flex flex-col gap-3 mt-7">
               <button
-                onClick={handleGoogleLoginConfirm}
+                onClick={handleGoogleLoginWithDetails}
                 className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
                 style={{
                   background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
@@ -527,7 +559,11 @@ export default function LoginPage() {
               </button>
 
               <button
-                onClick={() => setShowGoogleModal(false)}
+                onClick={() => {
+                  setShowGoogleModal(false)
+                  setGoogleIdToken(null)
+                  setForm(f => ({ ...f, universityRollNumber: '', section: '' }))
+                }}
                 className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:bg-white/10"
                 style={{
                   background: 'rgba(255,255,255,0.05)',
