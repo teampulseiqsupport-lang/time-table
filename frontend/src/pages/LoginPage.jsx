@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
-import { Eye, EyeOff, Lock, Mail, Shield, Sparkles, UserRound, ArrowRight, Zap, Bell, CalendarDays, AlertCircle, Search, Check, ChevronDown, Hash } from 'lucide-react'
+import { Eye, EyeOff, Lock, Mail, Shield, Sparkles, UserRound, ArrowRight, Zap, Bell, CalendarDays, AlertCircle } from 'lucide-react'
 import { googleLoginUser, loginUser, clearError } from '../store/slices/authSlice'
 import { signInWithGoogle } from '../services/firebaseAuth'
-import api from '../services/api'
 import toast from 'react-hot-toast'
 
 const FloatingOrb = ({ className }) => (
@@ -29,54 +28,24 @@ export default function LoginPage() {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const { loading, error } = useSelector(s => s.auth)
-  const [form, setForm] = useState({ identifier: '', password: '', universityRollNumber: '', section: '' })
+  const [form, setForm] = useState({ identifier: '', password: '' })
   const [showPass, setShowPass] = useState(false)
   const [isAdminMode, setIsAdminMode] = useState(false)
   const [focusedField, setFocusedField] = useState(null)
   const [showRegisterModal, setShowRegisterModal] = useState(false)
-  const [showGoogleModal, setShowGoogleModal] = useState(false)
-  const [sections, setSections] = useState([])
-  const [sectionSearch, setSectionSearch] = useState('')
-  const [sectionOpen, setSectionOpen] = useState(false)
-  const [loadingSections, setLoadingSections] = useState(false)
-  const [googleIdToken, setGoogleIdToken] = useState(null)
   const [failedLoginType, setFailedLoginType] = useState(null)
 
   useEffect(() => {
     if (error) {
       const errorLower = error.toLowerCase()
-      // If it's a "not found" error
+      // If it's a "not found" error, show register modal
       if (errorLower.includes('not found') || errorLower.includes('does not exist') || errorLower.includes('user not')) {
-        // If failed login was Google, show modal to collect roll number/section
-        if (failedLoginType === 'google') {
-          openGoogleModal()
-        } else {
-          // For email/password login, redirect to register
-          setShowRegisterModal(true)
-        }
+        setShowRegisterModal(true)
       }
       setFailedLoginType(null)
       dispatch(clearError())
     }
   }, [error, dispatch, failedLoginType])
-
-  const fetchSections = async () => {
-    if (sections.length > 0) return
-    setLoadingSections(true)
-    try {
-      const { data } = await api.get('/sections', { params: { session: '2025-26' } })
-      setSections(Array.isArray(data?.sections) ? data.sections : [])
-    } catch (error) {
-      console.error('Failed to fetch sections:', error)
-      setSections([])
-    } finally {
-      setLoadingSections(false)
-    }
-  }
-
-  const filteredSections = sections.filter(s =>
-    (s?.name || '').toLowerCase().includes(sectionSearch.toLowerCase())
-  )
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -87,45 +56,13 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     try {
       const idToken = await signInWithGoogle()
-      setGoogleIdToken(idToken)
       setFailedLoginType('google')
-      // Try to login first - if user exists, will be handled by dispatch
-      // If user doesn't exist, error will be caught in useEffect
+      // Try to login - if account doesn't exist, error will trigger and show register modal
       await dispatch(googleLoginUser({ idToken, session: '2025-26', year: '3rd Year' }))
     } catch (error) {
       toast.error(error.message || 'Google sign-in failed')
       setFailedLoginType(null)
     }
-  }
-
-  const handleGoogleLoginWithDetails = async () => {
-    if (!form.universityRollNumber || !form.section) {
-      toast.error('Please select section and enter roll number')
-      return
-    }
-    if (!googleIdToken) {
-      toast.error('Authentication token missing, please try again')
-      return
-    }
-    try {
-      await dispatch(googleLoginUser({
-        idToken: googleIdToken,
-        universityRollNumber: form.universityRollNumber,
-        section: form.section,
-        session: '2025-26',
-        year: '3rd Year'
-      }))
-      setShowGoogleModal(false)
-      setGoogleIdToken(null)
-      setFailedLoginType(null)
-    } catch (error) {
-      toast.error(error.message || 'Google sign-in failed')
-    }
-  }
-
-  const openGoogleModal = async () => {
-    await fetchSections()
-    setShowGoogleModal(true)
   }
 
   const inputClass = (field) =>
@@ -414,7 +351,7 @@ export default function LoginPage() {
 
             {/* Description */}
             <p className="text-slate-300 text-center text-sm leading-relaxed mb-7">
-              This email or roll number isn't registered yet. Create your account on the registration page and select your section to get started.
+              Please create your account on the registration page with your email, university roll number, and section.
             </p>
 
             {/* Action Buttons */}
@@ -453,128 +390,6 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* Google Login Modal - Collect Roll Number & Section */}
-      {showGoogleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowGoogleModal(false)}
-          />
-
-          {/* Modal */}
-          <div
-            className="relative rounded-3xl p-8 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto"
-            style={{
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(15,17,35,0.98) 100%)',
-              border: '1px solid rgba(99,102,241,0.3)',
-              backdropFilter: 'blur(20px)'
-            }}>
-            {/* Title */}
-            <h2 className="text-2xl font-bold text-white mb-2">
-              Complete Your Profile
-            </h2>
-            <p className="text-slate-300 text-sm mb-6">
-              We need your university details to link your Google account.
-            </p>
-
-            {/* Form */}
-            <div className="space-y-4">
-              {/* Roll Number */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">University Roll Number</label>
-                <div className="relative">
-                  <Hash size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600" />
-                  <input
-                    value={form.universityRollNumber}
-                    onChange={e => setForm({ ...form, universityRollNumber: e.target.value.toUpperCase() })}
-                    onFocus={() => setFocusedField('roll')}
-                    onBlur={() => setFocusedField(null)}
-                    className={`w-full bg-white/[0.04] border ${focusedField === 'roll' ? 'border-indigo-400/60 ring-2 ring-indigo-500/15' : 'border-white/10'} rounded-xl pl-10 pr-4 py-3 text-white placeholder-slate-500 text-sm transition-all duration-200 outline-none hover:border-white/20 uppercase font-mono tracking-widest`}
-                    placeholder="2315000***"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Section dropdown */}
-              <div className="relative">
-                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">Section</label>
-                <button
-                  type="button"
-                  onClick={() => setSectionOpen(!sectionOpen)}
-                  className={`w-full text-left pl-4 pr-4 py-3 rounded-xl text-sm flex items-center justify-between transition-all duration-200 ${sectionOpen ? 'border-indigo-400/60 ring-2 ring-indigo-500/15' : 'border-white/10 hover:border-white/20'} bg-white/[0.04] border`}
-                  style={{ color: form.section ? '#fff' : '#64748b' }}>
-                  <span>{form.section || 'Pick your section'}</span>
-                  <ChevronDown size={15} className={`text-slate-500 transition-transform duration-200 ${sectionOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                {sectionOpen && (
-                  <div className="absolute z-30 w-full mt-1.5 rounded-2xl shadow-2xl overflow-hidden"
-                    style={{ background: '#0d1126', border: '1px solid rgba(99,102,241,0.25)' }}>
-                    <div className="p-2.5 border-b" style={{ borderColor: 'rgba(99,102,241,0.1)' }}>
-                      <div className="relative">
-                        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                        <input
-                          value={sectionSearch}
-                          onChange={e => setSectionSearch(e.target.value)}
-                          className="w-full bg-white/[0.04] border border-white/8 rounded-lg pl-8 pr-3 py-2 text-sm text-white placeholder-slate-600 outline-none focus:border-indigo-500/40"
-                          placeholder="Search section..."
-                          autoFocus
-                        />
-                      </div>
-                    </div>
-                    <div className="max-h-40 overflow-y-auto p-1.5">
-                      {loadingSections ? (
-                        <p className="text-slate-500 text-xs text-center py-4">Loading sections…</p>
-                      ) : filteredSections.length === 0 ? (
-                        <p className="text-slate-600 text-xs text-center py-4">No sections found</p>
-                      ) : filteredSections.map(sec => (
-                        <button
-                          key={sec._id || sec.name}
-                          type="button"
-                          onClick={() => { setForm({ ...form, section: sec.name }); setSectionOpen(false); setSectionSearch('') }}
-                          className={`w-full text-left px-3 py-2.5 rounded-xl text-sm flex items-center justify-between transition-all duration-150 ${form.section === sec.name ? 'text-indigo-300 bg-indigo-500/15' : 'text-slate-300 hover:bg-white/5'}`}>
-                          {sec.name}
-                          {form.section === sec.name && <Check size={13} className="text-indigo-400" />}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col gap-3 mt-7">
-              <button
-                onClick={handleGoogleLoginWithDetails}
-                className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
-                style={{
-                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                  boxShadow: '0 0 30px rgba(99,102,241,0.3)'
-                }}>
-                <Sparkles size={16} />
-                Continue with Google
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowGoogleModal(false)
-                  setGoogleIdToken(null)
-                  setForm(f => ({ ...f, universityRollNumber: '', section: '' }))
-                }}
-                className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:bg-white/10"
-                style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)'
-                }}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
