@@ -121,21 +121,54 @@ router.post('/register', async (req, res) => {
 // @POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
-    const { email, identifier, password } = req.body;
+    const { email, identifier, password, universityRollNumber, section, year, session } = req.body;
     const loginId = (identifier || email || '').toString().trim();
 
     if (!loginId || !password) {
       return res.status(400).json({ success: false, message: 'Please provide email/roll number and password' });
     }
 
-    const user = await User.findOne({
+    let user = await User.findOne({
       $or: [
         { email: loginId.toLowerCase() },
         { universityRollNumber: normalizeRollNumber(loginId) }
       ]
     }).select('+password');
-    if (!user || !user.password || !(await user.comparePassword(password))) {
-      return res.status(401).json({ success: false, message: 'Invalid email/roll number or password' });
+
+    if (!user) {
+      // Account doesn't exist - check if they provided roll number and section for account creation
+      if (!universityRollNumber || !section) {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Account not found. Please provide your university roll number and section to create account.' 
+        });
+      }
+
+      // Create account with provided details
+      const rollNumber = normalizeRollNumber(universityRollNumber);
+      
+      // Check if roll number already exists
+      const rollExists = await User.findOne({ universityRollNumber: rollNumber });
+      if (rollExists) {
+        return res.status(400).json({ success: false, message: 'Roll number already registered with another account' });
+      }
+
+      user = await User.create({
+        name: loginId.split('@')[0],
+        email: loginId.toLowerCase(),
+        password,
+        universityRollNumber: rollNumber,
+        section,
+        year: year || '3rd Year',
+        session: session || '2025-26',
+        role: 'student',
+        authProvider: 'local'
+      });
+    } else {
+      // User exists - verify password
+      if (!user.password || !(await user.comparePassword(password))) {
+        return res.status(401).json({ success: false, message: 'Invalid email/roll number or password' });
+      }
     }
 
     res.json({
@@ -150,10 +183,10 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// @POST /api/auth/google - Login with Firebase Google auth (NO AUTO SIGNUP)
+// @POST /api/auth/google - Login/signup with Firebase Google auth
 router.post('/google', async (req, res) => {
   try {
-    const { idToken } = req.body;
+    const { idToken, section, year, session, universityRollNumber } = req.body;
 
     if (!idToken) {
       return res.status(400).json({ success: false, message: 'Google ID token required' });
@@ -170,17 +203,41 @@ router.post('/google', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Google account email not available' });
     }
 
-    const user = await User.findOne({ email: decoded.email.toLowerCase() });
+    const rollNumber = normalizeRollNumber(universityRollNumber);
+    let user = await User.findOne({ email: decoded.email.toLowerCase() });
 
     if (!user) {
-      // User doesn't exist - they must register first
-      return res.status(404).json({ success: false, message: 'User account not found. Please register first.' });
-    }
+      // User doesn't exist - require roll number and section
+      if (!rollNumber || !section) {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Please provide your university roll number and section to create account with Google.' 
+        });
+      }
 
-    // Update avatar if available
-    if (decoded.picture && !user.avatar) {
-      user.avatar = decoded.picture;
-      await user.save();
+      // Check if roll number already exists
+      const rollExists = await User.findOne({ universityRollNumber: rollNumber });
+      if (rollExists) {
+        return res.status(400).json({ success: false, message: 'Roll number already registered with another account' });
+      }
+
+      user = await User.create({
+        name: decoded.name || decoded.email.split('@')[0],
+        email: decoded.email,
+        universityRollNumber: rollNumber,
+        avatar: decoded.picture || null,
+        section,
+        year: year || '3rd Year',
+        session: session || '2025-26',
+        role: 'student',
+        authProvider: 'google'
+      });
+    } else {
+      // User exists - update avatar if available
+      if (decoded.picture && !user.avatar) {
+        user.avatar = decoded.picture;
+        await user.save();
+      }
     }
 
     res.json({
