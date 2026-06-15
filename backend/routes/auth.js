@@ -13,6 +13,31 @@ const generateToken = (id) => {
 
 const normalizeRollNumber = (rollNumber) => rollNumber?.toString().trim().toUpperCase();
 
+const verifyGoogleIdToken = async (idToken) => {
+  if (!idToken) {
+    const error = new Error('Google ID token required');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!isFirebaseReady()) {
+    const error = new Error('Google authentication is not configured on the server');
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const firebaseAdmin = getFirebaseAdmin();
+  const decoded = await firebaseAdmin.auth().verifyIdToken(idToken);
+
+  if (!decoded.email) {
+    const error = new Error('Google account email not available');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return decoded;
+};
+
 const buildResetEmailHtml = ({ name, resetUrl }) => `
   <div style="margin:0;padding:0;background:#f4f7fb;font-family:Inter,Arial,sans-serif;color:#111827;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 12px;background:#f4f7fb;">
@@ -134,7 +159,14 @@ router.post('/login', async (req, res) => {
         { universityRollNumber: normalizeRollNumber(loginId) }
       ]
     }).select('+password');
-    if (!user || !user.password || !(await user.comparePassword(password))) {
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found. Kindly create your account first.'
+      });
+    }
+
+    if (!user.password || !(await user.comparePassword(password))) {
       return res.status(401).json({ success: false, message: 'Invalid email/roll number or password' });
     }
 
@@ -150,60 +182,23 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// @POST /api/auth/google - Login/signup with Firebase Google auth
+// @POST /api/auth/google - Login existing user with Firebase Google auth
 router.post('/google', async (req, res) => {
   try {
-    const { idToken, section, year, session, universityRollNumber } = req.body;
-
-    if (!idToken) {
-      return res.status(400).json({ success: false, message: 'Google ID token required' });
-    }
-
-    if (!isFirebaseReady()) {
-      return res.status(503).json({ success: false, message: 'Google authentication is not configured on the server' });
-    }
-
-    const firebaseAdmin = getFirebaseAdmin();
-    const decoded = await firebaseAdmin.auth().verifyIdToken(idToken);
-
-    if (!decoded.email) {
-      return res.status(400).json({ success: false, message: 'Google account email not available' });
-    }
-
-    const rollNumber = normalizeRollNumber(universityRollNumber);
-    let user = await User.findOne({ email: decoded.email.toLowerCase() });
+    const { idToken } = req.body;
+    const decoded = await verifyGoogleIdToken(idToken);
+    const user = await User.findOne({ email: decoded.email.toLowerCase() });
 
     if (!user) {
-      if (rollNumber) {
-        const rollExists = await User.findOne({ universityRollNumber: rollNumber });
-        if (rollExists) {
-          return res.status(400).json({ success: false, message: 'Roll number already registered with another account' });
-        }
-      }
-
-      user = await User.create({
-        name: decoded.name || decoded.email.split('@')[0],
-        email: decoded.email,
-        universityRollNumber: rollNumber,
-        avatar: decoded.picture || null,
-        section,
-        year: year || '3rd Year',
-        session: session || '2025-26',
-        role: 'student',
-        authProvider: 'google'
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found. Kindly create your account first.'
       });
-    } else {
-      const updates = {
-        authProvider: user.authProvider === 'local' ? 'local' : 'google',
-        avatar: user.avatar || decoded.picture || null
-      };
+    }
 
-      if (rollNumber && !user.universityRollNumber) updates.universityRollNumber = rollNumber;
-      if (section && !user.section) updates.section = section;
-      if (year && !user.year) updates.year = year;
-      if (session && !user.session) updates.session = session;
-
-      user = await User.findByIdAndUpdate(user._id, { $set: updates }, { new: true, runValidators: true });
+    if (!user.avatar && decoded.picture) {
+      user.avatar = decoded.picture;
+      await user.save({ validateBeforeSave: false });
     }
 
     res.json({
@@ -213,8 +208,57 @@ router.post('/google', async (req, res) => {
       user: user.toJSON()
     });
   } catch (error) {
-    console.error('Google auth error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Google login error:', error);
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
+  }
+});
+
+// @POST /api/auth/google/register - Register new user with Firebase Google auth
+router.post('/google/register', async (req, res) => {
+  try {
+    const { idToken, section, year, session, universityRollNumber } = req.body;
+    const decoded = await verifyGoogleIdToken(idToken);
+    const rollNumber = normalizeRollNumber(universityRollNumber);
+
+    if (!rollNumber || !section) {
+      return res.status(400).json({ success: false, message: 'Roll number and section are required for Google registration' });
+    }
+
+    const existingUser = await User.findOne({
+      $or: [
+        { email: decoded.email.toLowerCase() },
+        { universityRollNumber: rollNumber }
+      ]
+    });
+
+    if (existingUser) {
+      const message = existingUser.email === decoded.email.toLowerCase()
+        ? 'Account already exists. Please sign in with Google.'
+        : 'Roll number already registered with another account';
+      return res.status(400).json({ success: false, message });
+    }
+
+    const user = await User.create({
+      name: decoded.name || decoded.email.split('@')[0],
+      email: decoded.email,
+      universityRollNumber: rollNumber,
+      avatar: decoded.picture || null,
+      section,
+      year: year || '3rd Year',
+      session: session || '2025-26',
+      role: 'student',
+      authProvider: 'google'
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Google registration successful',
+      token: generateToken(user._id),
+      user: user.toJSON()
+    });
+  } catch (error) {
+    console.error('Google registration error:', error);
+    res.status(error.statusCode || 500).json({ success: false, message: error.message });
   }
 });
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Check, ChevronDown, Eye, EyeOff, GraduationCap, Hash, Lock, Mail, Search, User, Sparkles, ArrowRight, Shield, Zap, BookOpen } from 'lucide-react'
-import { googleLoginUser, registerUser } from '../store/slices/authSlice'
+import { googleRegisterUser, registerUser } from '../store/slices/authSlice'
 import { signInWithGoogle } from '../services/firebaseAuth'
 import api from '../services/api'
 import toast from 'react-hot-toast'
@@ -74,7 +74,7 @@ export default function RegisterPage() {
     }
     try {
       const idToken = await signInWithGoogle()
-      await dispatch(googleLoginUser({
+      await dispatch(googleRegisterUser({
         idToken,
         universityRollNumber: form.universityRollNumber,
         section: form.section,

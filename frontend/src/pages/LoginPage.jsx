@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { Eye, EyeOff, Lock, Mail, Shield, Sparkles, UserRound, ArrowRight, Zap, Bell, CalendarDays } from 'lucide-react'
 import { googleLoginUser, loginUser } from '../store/slices/authSlice'
@@ -26,21 +26,30 @@ const FeatureCard = ({ icon: Icon, title, desc, accent }) => (
 
 export default function LoginPage() {
   const dispatch = useDispatch()
+  const navigate = useNavigate()
   const { loading } = useSelector(s => s.auth)
   const [form, setForm] = useState({ identifier: '', password: '' })
   const [showPass, setShowPass] = useState(false)
   const [isAdminMode, setIsAdminMode] = useState(false)
   const [focusedField, setFocusedField] = useState(null)
 
-  const handleSubmit = (e) => {
+  const redirectIfAccountNotFound = (result) => {
+    if (result?.payload?.status === 404) {
+      navigate('/register')
+    }
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    dispatch(loginUser(form))
+    const result = await dispatch(loginUser(form))
+    redirectIfAccountNotFound(result)
   }
 
   const handleGoogleLogin = async () => {
     try {
       const idToken = await signInWithGoogle()
-      await dispatch(googleLoginUser({ idToken, session: '2025-26', year: '3rd Year' }))
+      const result = await dispatch(googleLoginUser({ idToken, session: '2025-26', year: '3rd Year' }))
+      redirectIfAccountNotFound(result)
     } catch (error) {
       toast.error(error.message || 'Google sign-in failed')
     }

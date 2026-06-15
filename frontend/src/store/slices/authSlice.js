@@ -8,7 +8,10 @@ export const loginUser = createAsyncThunk('auth/login', async (credentials, { re
     localStorage.setItem('token', data.token)
     return data
   } catch (err) {
-    return rejectWithValue(err.response?.data?.message || 'Login failed')
+    return rejectWithValue({
+      status: err.response?.status,
+      message: err.response?.data?.message || 'Login failed'
+    })
   }
 })
 
@@ -18,7 +21,20 @@ export const googleLoginUser = createAsyncThunk('auth/google', async (payload, {
     localStorage.setItem('token', data.token)
     return data
   } catch (err) {
-    return rejectWithValue(err.response?.data?.message || 'Google login failed')
+    return rejectWithValue({
+      status: err.response?.status,
+      message: err.response?.data?.message || 'Google login failed'
+    })
+  }
+})
+
+export const googleRegisterUser = createAsyncThunk('auth/googleRegister', async (payload, { rejectWithValue }) => {
+  try {
+    const { data } = await api.post('/auth/google/register', payload)
+    localStorage.setItem('token', data.token)
+    return data
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Google registration failed')
   }
 })
 
@@ -91,8 +107,8 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false
-        state.error = action.payload
-        toast.error(action.payload)
+        state.error = action.payload?.message || action.payload
+        toast.error(state.error)
       })
       .addCase(googleLoginUser.pending, (state) => { state.loading = true; state.error = null })
       .addCase(googleLoginUser.fulfilled, (state, action) => {
@@ -103,6 +119,19 @@ const authSlice = createSlice({
         toast.success(`Welcome, ${action.payload.user.name.split(' ')[0]}!`)
       })
       .addCase(googleLoginUser.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload?.message || action.payload
+        toast.error(state.error)
+      })
+      .addCase(googleRegisterUser.pending, (state) => { state.loading = true; state.error = null })
+      .addCase(googleRegisterUser.fulfilled, (state, action) => {
+        state.loading = false
+        state.user = action.payload.user
+        state.token = action.payload.token
+        state.initialized = true
+        toast.success('Registration successful! Welcome aboard!')
+      })
+      .addCase(googleRegisterUser.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload
         toast.error(action.payload)
