@@ -13,6 +13,24 @@ const generateToken = (id) => {
 
 const normalizeRollNumber = (rollNumber) => rollNumber?.toString().trim().toUpperCase();
 
+const normalizeRequestedRole = (role) => {
+  if (!role) return null;
+  const normalizedRole = role.toString().trim().toLowerCase();
+  return ['student', 'admin'].includes(normalizedRole) ? normalizedRole : null;
+};
+
+const roleLabel = (role) => role === 'admin' ? 'Admin' : 'Student';
+
+const validateRequestedRole = (user, requestedRole, res) => {
+  if (!requestedRole || user.role === requestedRole) return false;
+
+  res.status(403).json({
+    success: false,
+    message: `Wrong role selected. This account is registered as ${roleLabel(user.role)}. Please switch to ${roleLabel(user.role)} login.`
+  });
+  return true;
+};
+
 const verifyGoogleIdToken = async (idToken) => {
   if (!idToken) {
     const error = new Error('Google ID token required');
@@ -146,11 +164,16 @@ router.post('/register', async (req, res) => {
 // @POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
-    const { email, identifier, password } = req.body;
+    const { email, identifier, password, role } = req.body;
     const loginId = (identifier || email || '').toString().trim();
+    const requestedRole = normalizeRequestedRole(role);
 
     if (!loginId || !password) {
       return res.status(400).json({ success: false, message: 'Please provide email/roll number and password' });
+    }
+
+    if (role && !requestedRole) {
+      return res.status(400).json({ success: false, message: 'Invalid login role selected' });
     }
 
     const user = await User.findOne({
@@ -170,6 +193,8 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid email/roll number or password' });
     }
 
+    if (validateRequestedRole(user, requestedRole, res)) return;
+
     res.json({
       success: true,
       message: 'Login successful',
@@ -185,7 +210,13 @@ router.post('/login', async (req, res) => {
 // @POST /api/auth/google - Login existing user with Firebase Google auth
 router.post('/google', async (req, res) => {
   try {
-    const { idToken } = req.body;
+    const { idToken, role } = req.body;
+    const requestedRole = normalizeRequestedRole(role);
+
+    if (role && !requestedRole) {
+      return res.status(400).json({ success: false, message: 'Invalid login role selected' });
+    }
+
     const decoded = await verifyGoogleIdToken(idToken);
     const user = await User.findOne({ email: decoded.email.toLowerCase() });
 
@@ -195,6 +226,8 @@ router.post('/google', async (req, res) => {
         message: 'Account not found. Kindly create your account first.'
       });
     }
+
+    if (validateRequestedRole(user, requestedRole, res)) return;
 
     if (!user.avatar && decoded.picture) {
       user.avatar = decoded.picture;

@@ -41,14 +41,22 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const result = await dispatch(loginUser(form))
+    const result = await dispatch(loginUser({
+      ...form,
+      role: isAdminMode ? 'admin' : 'student'
+    }))
     redirectIfAccountNotFound(result)
   }
 
   const handleGoogleLogin = async () => {
     try {
       const idToken = await signInWithGoogle()
-      const result = await dispatch(googleLoginUser({ idToken, session: '2025-26', year: '3rd Year' }))
+      const result = await dispatch(googleLoginUser({
+        idToken,
+        session: '2025-26',
+        year: '3rd Year',
+        role: isAdminMode ? 'admin' : 'student'
+      }))
       redirectIfAccountNotFound(result)
     } catch (error) {
       toast.error(error.message || 'Google sign-in failed')
